@@ -1,6 +1,6 @@
 {
   "name": "@onarsuite/max-desktop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Max Desktop - agente locale sicuro per OnarSuite",
   "main": "out/main/index.js",

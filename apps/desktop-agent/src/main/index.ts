@@ -18,7 +18,7 @@ function createWindow(): void {
     backgroundColor: '#f5f6f2',
     title: 'Max Desktop',
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.mjs'),
+      preload: path.join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,

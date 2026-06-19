@@ -8,6 +8,14 @@ export default defineConfig({
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
+    build: {
+      rollupOptions: {
+        // Sandboxed preload scripts must be CommonJS. The workspace is
+        // type: "module", so emit a .cjs file to avoid an ESM preload that
+        // Electron silently refuses to load (window.maxDesktop undefined).
+        output: { format: 'cjs', entryFileNames: 'index.cjs' },
+      },
+    },
   },
   renderer: {
     resolve: {
