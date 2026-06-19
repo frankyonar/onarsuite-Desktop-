@@ -1,0 +1,62 @@
+{
+  "name": "@onarsuite/max-desktop",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Max Desktop - agente locale sicuro per OnarSuite",
+  "main": "out/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "dist:win": "npm run build && electron-builder --win nsis --x64",
+    "dist:mac": "npm run build && electron-builder --mac dmg",
+    "preview": "electron-vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "mammoth": "^1.10.0",
+    "pdf-parse": "^1.1.1",
+    "read-excel-file": "^6.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/react": "^18.3.20",
+    "@types/react-dom": "^18.3.6",
+    "@vitejs/plugin-react": "^4.4.1",
+    "electron": "42.4.1",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^3.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.1.4"
+  },
+  "build": {
+    "appId": "com.onarsuite.maxdesktop",
+    "productName": "Max Desktop",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": ["nsis"]
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.business"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

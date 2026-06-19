@@ -1,0 +1,14 @@
+{
+  "name": "max-desktop-workspace",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace @onarsuite/max-desktop run dev",
+    "build": "npm --workspace @onarsuite/max-desktop run build",
+    "test": "npm --workspace @onarsuite/max-desktop run test",
+    "typecheck": "npm --workspace @onarsuite/max-desktop run typecheck"
+  }
+}
