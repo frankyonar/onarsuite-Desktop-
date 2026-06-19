@@ -1,5 +1,20 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import type { ConnectionState } from '../../shared/types';
+
+/** Renders chat content as Markdown with GFM tables/lists and syntax-highlighted
+ *  code blocks — handles any text, code or formatting Max returns. */
+export function Markdown({ content }: { content: string }) {
+  return (
+    <div className="markdown">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 export function Button({ variant = 'primary', className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) {
   return <button className={`button button-${variant} ${className}`} {...props} />;

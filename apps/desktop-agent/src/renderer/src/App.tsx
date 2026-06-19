@@ -1,9 +1,23 @@
 import { useCallback, useEffect, useState, type DragEvent, type FormEvent } from 'react';
 import type { ActionResult, AppSnapshot, AuditEntry, ChatMessage, FileAction, LocalFile, PairingInput, ParsedDocument } from '../../shared/types';
 import { BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
-import { Button, Card, EmptyState, StatusPill } from './components';
+import { Button, Card, EmptyState, Markdown, StatusPill } from './components';
 
 type View = 'chat' | 'dashboard' | 'files' | 'folders' | 'logs' | 'settings';
+type Theme = 'light' | 'dark';
+
+function useTheme(): [Theme, () => void] {
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = localStorage.getItem('max-theme') as Theme | null;
+    if (saved) return saved;
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('max-theme', theme);
+  }, [theme]);
+  return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))];
+}
 
 const navItems: Array<{ id: View; label: string; icon: string }> = [
   { id: 'chat', label: 'Parla con Max', icon: 'M' },
@@ -25,6 +39,7 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'success' | 'error' | 'warning'; text: string }>();
+  const [theme, toggleTheme] = useTheme();
 
   const refresh = useCallback(async () => {
     if (!window.maxDesktop) throw new Error('Il collegamento sicuro con Max Desktop non è disponibile. Riavvia l’app.');
@@ -79,7 +94,7 @@ export function App() {
       <div className="sidebar-status"><StatusPill state={snapshot.connection} /><small>{snapshot.accountLabel || snapshot.deviceName}</small></div>
     </aside>
     <main className="main-content">
-      <header className="topbar"><div><span className="eyebrow">ONARSUITE / MAX DESKTOP</span><h1>{viewTitles[view]}</h1></div><div className="topbar-actions">{snapshot.pendingActions > 0 && <span className="queue-count">{snapshot.pendingActions} in coda</span>}<Button variant="secondary" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}>Sincronizza</Button></div></header>
+      <header className="topbar"><div><span className="eyebrow">ONARSUITE / MAX DESKTOP</span><h1>{viewTitles[view]}</h1></div><div className="topbar-actions">{snapshot.pendingActions > 0 && <span className="queue-count">{snapshot.pendingActions} in coda</span>}<button className="theme-toggle" title="Tema chiaro/scuro" onClick={toggleTheme}>{theme === 'dark' ? '☀' : '☾'}</button><Button variant="secondary" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}>Sincronizza</Button></div></header>
       {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
       {view === 'chat' && <ChatView messages={messages} files={files} selected={selected} busy={busy} onSelectFile={setSelected} onSend={async (text) => {
         const user: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, createdAt: new Date().toISOString() };
@@ -111,7 +126,7 @@ function PairingPage({ snapshot, busy, notice, onPair }: { snapshot: AppSnapshot
 function ChatView({ messages, files, selected, busy, onSelectFile, onSend }: { messages: ChatMessage[]; files: LocalFile[]; selected?: LocalFile; busy: boolean; onSelectFile: (file?: LocalFile) => void; onSend: (text: string) => void }) {
   const [text, setText] = useState('');
   const submit = (event: FormEvent) => { event.preventDefault(); const value = text.trim(); if (!value || busy) return; setText(''); onSend(value); };
-  return <div className="chat-shell"><div className="chat-stream">{messages.length === 0 ? <div className="chat-welcome"><div className="max-mark">M</div><span className="eyebrow">MAX AI + ONARSUITE</span><h2>Cosa facciamo oggi?</h2><p>Puoi chiedere a Max di analizzare un documento, preparare una bozza o trasformare il contenuto in un’attività OnarSuite.</p><div className="prompt-grid">{['Riassumi il documento selezionato', 'Estrai i dati del cliente', 'Prepara una bozza di preventivo', 'Suggerisci le prossime attività'].map((prompt) => <button key={prompt} onClick={() => onSend(prompt)}>{prompt}<span>→</span></button>)}</div></div> : messages.map((message) => <div key={message.id} className={`chat-message ${message.role}`}><div className="chat-avatar">{message.role === 'assistant' ? 'M' : 'Tu'}</div><div><strong>{message.role === 'assistant' ? 'Max' : 'Tu'}</strong><p>{message.content}</p></div></div>)}{busy && <div className="chat-message assistant"><div className="chat-avatar">M</div><div><strong>Max</strong><p>Sto lavorando…</p></div></div>}</div><form className="composer" onSubmit={submit}><div className="context-picker"><span>Contesto:</span><select value={selected?.path || ''} onChange={(event) => onSelectFile(files.find((file) => file.path === event.target.value))}><option value="">Nessun documento</option>{files.map((file) => <option key={file.id} value={file.path}>{file.name}</option>)}</select></div><div className="composer-row"><textarea value={text} onChange={(event) => setText(event.target.value)} placeholder="Scrivi a Max…" rows={3} /><Button disabled={busy || !text.trim()}>Invia</Button></div><small>I file vengono inviati a OnarSuite solo quando confermi un’azione o li usi esplicitamente come contesto.</small></form></div>;
+  return <div className="chat-shell"><div className="chat-stream">{messages.length === 0 ? <div className="chat-welcome"><div className="max-mark">M</div><span className="eyebrow">MAX AI + ONARSUITE</span><h2>Cosa facciamo oggi?</h2><p>Puoi chiedere a Max di analizzare un documento, preparare una bozza o trasformare il contenuto in un’attività OnarSuite.</p><div className="prompt-grid">{['Riassumi il documento selezionato', 'Estrai i dati del cliente', 'Prepara una bozza di preventivo', 'Suggerisci le prossime attività'].map((prompt) => <button key={prompt} onClick={() => onSend(prompt)}>{prompt}<span>→</span></button>)}</div></div> : messages.map((message) => <div key={message.id} className={`chat-message ${message.role}`}><div className="chat-avatar">{message.role === 'assistant' ? 'M' : 'Tu'}</div><div><strong>{message.role === 'assistant' ? 'Max' : 'Tu'}</strong>{message.role === 'assistant' ? <Markdown content={message.content} /> : <p>{message.content}</p>}</div></div>)}{busy && <div className="chat-message assistant"><div className="chat-avatar">M</div><div><strong>Max</strong><p>Sto lavorando…</p></div></div>}</div><form className="composer" onSubmit={submit}><div className="context-picker"><span>Contesto:</span><select value={selected?.path || ''} onChange={(event) => onSelectFile(files.find((file) => file.path === event.target.value))}><option value="">Nessun documento</option>{files.map((file) => <option key={file.id} value={file.path}>{file.name}</option>)}</select></div><div className="composer-row"><textarea value={text} onChange={(event) => setText(event.target.value)} placeholder="Scrivi a Max…" rows={3} /><Button disabled={busy || !text.trim()}>Invia</Button></div><small>I file vengono inviati a OnarSuite solo quando confermi un’azione o li usi esplicitamente come contesto.</small></form></div>;
 }
 
 function Dashboard({ snapshot, files, logs, onGoFiles, onSync }: { snapshot: AppSnapshot; files: LocalFile[]; logs: AuditEntry[]; onGoFiles: () => void; onSync: () => void }) { return <div className="page-grid"><Card className="hero-card"><div className="hero-copy"><span className="eyebrow">WORKSPACE SICURA</span><h2>{snapshot.connection === 'connected' ? 'Max è pronto a lavorare.' : 'Max sta lavorando in modalità offline.'}</h2><p>I file restano sul computer finché non confermi un’azione verso OnarSuite.</p><div className="hero-actions"><Button onClick={onGoFiles}>Aggiungi un documento</Button><Button variant="secondary" onClick={onSync}>Controlla connessione</Button></div></div><div className="orb"><div className="max-mark">M</div><StatusPill state={snapshot.connection} /></div></Card><div className="stats-grid"><Stat label="Documenti visibili" value={String(files.length)} detail="Workspace e cartelle autorizzate" /><Stat label="Azioni in coda" value={String(snapshot.pendingActions)} detail="Sincronizzazione automatica" /><Stat label="Ultimo sync" value={snapshot.lastSyncAt ? formatDate(snapshot.lastSyncAt) : 'Mai'} detail={`Versione ${snapshot.appVersion}`} /></div><Card title="Attività recenti">{logs.length ? <div className="activity-list">{logs.slice(0, 5).map((log) => <div key={log.id}><span className={`log-dot ${log.level}`} /><div><strong>{log.message}</strong><small>{formatDate(log.createdAt)} · {log.eventType}</small></div></div>)}</div> : <EmptyState icon="◎" title="Nessuna attività">Le azioni di Max appariranno qui.</EmptyState>}</Card></div>; }

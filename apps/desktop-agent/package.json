@@ -1,6 +1,6 @@
 {
   "name": "@onarsuite/max-desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Max Desktop - agente locale sicuro per OnarSuite",
   "main": "out/main/index.js",
@@ -15,11 +15,15 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
+    "highlight.js": "^11.11.1",
     "mammoth": "^1.10.0",
     "pdf-parse": "^1.1.1",
-    "read-excel-file": "^6.0.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "read-excel-file": "^6.0.1",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
@@ -46,10 +50,14 @@
       "package.json"
     ],
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.business"
     },
     "nsis": {
