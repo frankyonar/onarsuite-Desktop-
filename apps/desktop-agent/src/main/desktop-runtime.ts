@@ -31,7 +31,12 @@ export class DesktopRuntime {
     async () => (await this.config.read()).serverUrl,
     async () => this.config.getToken(),
   );
-  readonly tools = new AgentTools(this.config, this.audit, (kind, filePath) => this.performFileAction(filePath, kind));
+  readonly tools = new AgentTools(
+    this.config,
+    this.audit,
+    (filePath) => this.performFileAction(filePath, 'upload'),
+    (actionType, data) => this.sdk.onarExecute(actionType, data),
+  );
   readonly engine = new AgentEngine(this.sdk, this.tools, this.audit);
   private connection: AppSnapshot['connection'] = 'not_paired';
   private readonly queuePath = path.join(this.config.dataDirectory, 'queue.json');

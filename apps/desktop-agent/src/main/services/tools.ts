@@ -2,7 +2,7 @@ import { exec } from 'node:child_process';
 import { mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { ActionResult, FileAction } from '../../shared/types';
+import type { ActionResult } from '../../shared/types';
 import { isAllowedPath } from '../../shared/path-policy';
 import type { AuditLog } from './audit-log';
 import type { ConfigStore } from './config-store';
@@ -38,7 +38,8 @@ export class AgentTools {
   constructor(
     private readonly config: ConfigStore,
     private readonly audit: AuditLog,
-    private readonly onar: (kind: FileAction, filePath: string) => Promise<ActionResult>,
+    private readonly onarUpload: (filePath: string) => Promise<ActionResult>,
+    private readonly onarExecute: (actionType: string, data: Record<string, unknown>) => Promise<{ success: boolean; message: string }>,
   ) {}
 
   /** OpenAI-style tool schemas advertised to the model each step. */
@@ -76,10 +77,13 @@ export class AgentTools {
         command: { type: 'string', description: 'Comando da eseguire.' },
         cwd: { type: 'string', description: 'Cartella di lavoro (opzionale).' },
       }, ['command']),
-      fn('onar_action', 'Esegui un\'azione su OnarSuite a partire da un file: carica o crea task/cliente/preventivo in bozza.', {
-        kind: { type: 'string', enum: ['upload', 'create_task', 'create_customer_draft', 'create_quote_draft'] },
+      fn('onar_action', 'Esegui un\'azione REALE su OnarSuite (stesso potere del Max in-app). Usa SEMPRE questo per agire su OnarSuite, mai messaggi di testo speciali.', {
+        action_type: { type: 'string', description: 'Es: create_user {name,email,role_id,mobile_no?}, create_note {title,content}, create_reminder {title,date,description?}, create_contract {title,content,amount?}, create_ticket {subject,description}, create_product {name,price}, calendar_create_event {title,start,end}, drive_create_file {name,content}, library_search {query}, contract_search {query}, web_search {query}.' },
+        data: { type: 'object', description: 'Oggetto con i campi richiesti dall\'azione.' },
+      }, ['action_type', 'data']),
+      fn('onar_upload', 'Carica un file locale come allegato su OnarSuite.', {
         path: filePath,
-      }, ['kind', 'path']),
+      }, ['path']),
     ];
   }
 
@@ -93,7 +97,8 @@ export class AgentTools {
       case 'create_file': return this.createFile(String(args.path ?? ''), String(args.content ?? ''));
       case 'delete_file': return this.deleteFile(String(args.path ?? ''));
       case 'run_shell': return this.runShell(String(args.command ?? ''), args.cwd ? String(args.cwd) : undefined);
-      case 'onar_action': return this.onarAction(String(args.kind ?? ''), String(args.path ?? ''));
+      case 'onar_action': return this.onarAction(String(args.action_type ?? ''), (args.data as Record<string, unknown>) ?? {});
+      case 'onar_upload': return this.onarUploadFile(String(args.path ?? ''));
       default: return { ok: false, content: `Strumento sconosciuto: ${name}`, preview: 'Strumento sconosciuto' };
     }
   }
@@ -224,13 +229,21 @@ export class AgentTools {
     }
   }
 
-  private async onarAction(kind: string, p: string): Promise<ToolResult> {
-    const allowed: FileAction[] = ['upload', 'create_task', 'create_customer_draft', 'create_quote_draft'];
-    if (!allowed.includes(kind as FileAction)) {
-      return { ok: false, content: `Azione OnarSuite non valida: ${kind}.`, preview: 'Azione non valida' };
+  private async onarAction(actionType: string, data: Record<string, unknown>): Promise<ToolResult> {
+    if (!actionType.trim()) return { ok: false, content: 'action_type mancante.', preview: 'action_type mancante' };
+    try {
+      const result = await this.onarExecute(actionType, data);
+      await this.log('agent_onar_action', 'info', `Azione OnarSuite: ${actionType}`, { actionType, ok: result.success });
+      return { ok: result.success, content: result.message, preview: `${actionType} · ${result.message}` };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Azione OnarSuite fallita.';
+      return { ok: false, content: message, preview: `${actionType} · errore` };
     }
+  }
+
+  private async onarUploadFile(p: string): Promise<ToolResult> {
     const target = await this.assertInside(p);
-    const result = await this.onar(kind as FileAction, target);
+    const result = await this.onarUpload(target);
     return { ok: result.status === 'completed', content: result.message, preview: result.message };
   }
 

@@ -1,7 +1,7 @@
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, FsEntry, LocalFile, MaxDesktopApi } from '../../shared/types';
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.5.0', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.5.1', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -79,10 +79,10 @@ export function createPreviewApi(): MaxDesktopApi {
       emit({ type: 'tool_start', runId, id: 't3', tool: 'edit_file', title: 'Modifica', command: 'edit · contratto.html' });
       await wait(700);
       emit({ type: 'tool_end', runId, id: 't3', ok: true, isDiff: true, preview: '- <h1>Contratto di servizio</h1>\n+ <h1>Contratto di servizio — OnarSuite</h1>' });
-      emit({ type: 'tool_start', runId, id: 't4', tool: 'run_shell', title: 'Shell', command: 'run · git status' });
+      emit({ type: 'tool_start', runId, id: 't4', tool: 'onar_action', title: 'OnarSuite', command: 'create_user' });
       await wait(800);
-      emit({ type: 'tool_end', runId, id: 't4', ok: true, preview: 'On branch master\nChanges not staged for commit:\n  modified: contratto.html' });
-      emit({ type: 'assistant', runId, text: `Fatto ✅\n\n- Intestazione contratto aggiornata\n- Stato git verificato\n\nVuoi che crei anche il preventivo collegato in OnarSuite?` });
+      emit({ type: 'tool_end', runId, id: 't4', ok: true, preview: "create_user · Utente 'Ferdinando Franzese' creato. Password temporanea: 7Kf9pQ2xL4mZ" });
+      emit({ type: 'assistant', runId, text: `Fatto ✅\n\n- Letto il contratto e aggiornata l'intestazione\n- Creato l'utente Ferdinando Franzese in OnarSuite (ruolo Cliente)\n\nLa password temporanea è nel risultato qui sopra.` });
       emit({ type: 'done', runId });
       void input;
     },

@@ -9,14 +9,18 @@ const MAX_ITERATIONS = 25;
 const AGENT_SYSTEM = `Sei Max, un assistente AI autonomo in esecuzione dentro "Max Desktop" sul computer dell'utente.
 Lavori come un dipendente esperto che aiuta l'utente con OnarSuite e con i file locali.
 
-Hai a disposizione strumenti per leggere, scrivere, modificare, creare ed eliminare file dentro le cartelle autorizzate, per cercare nel contenuto, per eseguire comandi di shell (npm, git, ecc.) e per creare cose in OnarSuite (task, clienti, preventivi, upload).
+STRUMENTI (usa SOLO questi per agire — niente marcatori di testo):
+- File locali: read_file, list_dir, search_files, write_file, edit_file, create_file, delete_file (solo nelle cartelle autorizzate).
+- Shell: run_shell (npm, git, ecc.) con cwd in una cartella autorizzata.
+- OnarSuite: onar_action(action_type, data) esegue azioni REALI sul gestionale — create_user {name,email,role_id,mobile_no?}, create_note, create_reminder, create_contract, create_ticket, create_product, calendar_create_event, drive_create_file/drive_list_items, library_search, contract_search, web_search, e altre. onar_upload(path) carica un file.
 
-Regole operative:
-- Agisci in AUTONOMIA: usa direttamente gli strumenti per portare a termine il compito, senza chiedere conferma a ogni passo.
-- Prima di modificare un file, leggilo per capire il contesto. Fai modifiche mirate con edit_file.
-- Lavora solo dentro le cartelle autorizzate; se serve una cartella non autorizzata, spiega all'utente come aggiungerla.
-- Dopo aver completato il lavoro, riassumi in italiano, in modo conciso, cosa hai fatto.
-- Sii pragmatico e diretto. Non inventare percorsi: usa list_dir e search_files per orientarti.`;
+REGOLE TASSATIVE (la fiducia dell'utente dipende da queste):
+1. NON dichiarare MAI di aver fatto qualcosa se non dopo che lo strumento corrispondente ha restituito esito positivo. Niente "fatto", "creato", "ho letto" senza la chiamata reale e il suo risultato.
+2. Per agire su OnarSuite usa SEMPRE il tool onar_action. NON scrivere mai marcatori tipo <<<MAXAI>>> né JSON di "navigate": l'app NON li esegue, sarebbe una bugia.
+3. Per conoscere il contenuto di un file LEGGILO con read_file (i PDF/DOCX vengono estratti). search_files cerca solo nei file di testo, NON nei PDF: per un PDF usa read_file. Non inventare mai contenuti o dati che non hai letto.
+4. Se uno strumento torna vuoto o "nessun risultato", DILLO chiaramente e chiedi indicazioni; non riempire i vuoti con supposizioni.
+5. Se ti manca un dato obbligatorio (es. email o role_id per create_user), chiedilo prima di chiamare il tool.
+6. Lavora in autonomia, ma riporta sempre l'esito REALE restituito dagli strumenti. Alla fine riassumi in italiano, conciso, solo ciò che è davvero accaduto.`;
 
 /**
  * Drives the autonomous tool-use loop. Keeps the full message list (including
@@ -118,7 +122,8 @@ function describe(tool: ToolName, args: Record<string, unknown>): { title: strin
     case 'create_file': return { title: 'Creazione', command: `create · ${base}` };
     case 'delete_file': return { title: 'Eliminazione', command: `delete · ${base}` };
     case 'run_shell': return { title: 'Shell', command: `run · ${String(args.command ?? '')}` };
-    case 'onar_action': return { title: 'OnarSuite', command: `${String(args.kind ?? 'azione')} · ${base}` };
+    case 'onar_action': return { title: 'OnarSuite', command: `${String(args.action_type ?? 'azione')}` };
+    case 'onar_upload': return { title: 'OnarSuite', command: `upload · ${base}` };
     default: return { title: 'Strumento', command: tool };
   }
 }

@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.5.0';
+export const APP_VERSION = '0.5.1';
 
 /** Capabilities Max can use autonomously inside authorized folders. */
 export const MVP_SCOPES = [
@@ -35,7 +35,8 @@ export type ToolName =
   | 'create_file'
   | 'delete_file'
   | 'run_shell'
-  | 'onar_action';
+  | 'onar_action'
+  | 'onar_upload';
 
 /** OpenAI-style message used inside the agent loop. */
 export interface AgentMessage {

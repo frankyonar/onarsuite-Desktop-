@@ -60,6 +60,15 @@ export class AgentSdk {
     });
   }
 
+  /** Run a real OnarSuite action (same catalog as the in-app Max assistant). */
+  async onarExecute(actionType: string, data: Record<string, unknown>): Promise<{ success: boolean; message: string }> {
+    const result = await this.request<{ success?: boolean; message?: string; error?: string }>('/api/agent/actions/execute', {
+      method: 'POST',
+      body: JSON.stringify({ action_type: actionType, data }),
+    });
+    return { success: Boolean(result.success), message: result.message || result.error || 'Azione completata.' };
+  }
+
   /** One tool-calling step. The server runs inference; we execute tools locally. */
   async agentStep(
     agentSystem: string,
