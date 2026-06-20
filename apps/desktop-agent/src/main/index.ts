@@ -51,6 +51,13 @@ function registerIpc(): void {
   ipcMain.handle('sync:now', () => runtime.syncNow());
   ipcMain.handle('app:clear-local-data', () => runtime.clearLocalData());
   ipcMain.handle('chat:send', (_event, input) => runtime.sendChat(input));
+  ipcMain.handle('agent:run', (event, input) =>
+    runtime.runAgent(input, (streamEvent) => event.sender.send('agent:event', streamEvent)));
+  ipcMain.handle('agent:cancel', () => runtime.cancelAgent());
+  ipcMain.handle('agent:reset', () => runtime.resetAgent());
+  ipcMain.handle('fs:explore', (_event, dirPath?: string) => runtime.explore(dirPath));
+  ipcMain.handle('fs:read', (_event, filePath: string) => runtime.readFileText(filePath));
+  ipcMain.handle('fs:write', (_event, filePath: string, text: string) => runtime.writeFileText(filePath, text));
 }
 
 app.whenReady().then(async () => {

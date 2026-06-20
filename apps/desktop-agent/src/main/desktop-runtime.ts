@@ -2,12 +2,16 @@ import { dialog, safeStorage, shell } from 'electron';
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { APP_VERSION, type ActionResult, type AppSnapshot, type ChatRequest, type ChatResult, type FileAction, type LocalFile, type PairingInput } from '../shared/types';
+import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type FileAction, type FileContent, type FsEntry, type LocalFile, type PairingInput } from '../shared/types';
 import { isAllowedPath } from '../shared/path-policy';
 import { AgentSdk, NetworkError, RevokedDeviceError } from './services/agent-sdk';
+import { AgentEngine } from './services/agent-engine';
+import { AgentTools } from './services/tools';
 import { AuditLog } from './services/audit-log';
 import { ConfigStore } from './services/config-store';
 import { isSupportedFile, parseDocument } from './services/document-parser';
+
+const MAX_READ_BYTES = 500 * 1024;
 
 interface QueuedAction {
   id: string;
@@ -27,6 +31,8 @@ export class DesktopRuntime {
     async () => (await this.config.read()).serverUrl,
     async () => this.config.getToken(),
   );
+  readonly tools = new AgentTools(this.config, this.audit, (kind, filePath) => this.performFileAction(filePath, kind));
+  readonly engine = new AgentEngine(this.sdk, this.tools, this.audit);
   private connection: AppSnapshot['connection'] = 'not_paired';
   private readonly queuePath = path.join(this.config.dataDirectory, 'queue.json');
   private syncInProgress = false;
@@ -297,6 +303,66 @@ export class DesktopRuntime {
     }
   }
 
+  /** Run the autonomous agent loop, streaming tool/assistant events to the UI. */
+  async runAgent(input: AgentRunInput, emit: (event: AgentStreamEvent) => void): Promise<void> {
+    const message = input.message.trim();
+    if (!message) throw new Error('Scrivi un messaggio per Max.');
+    const config = await this.config.read();
+    if (!config.deviceId) {
+      emit({ type: 'error', runId: 'pre', message: 'Collega prima Max Desktop a OnarSuite.' });
+      return;
+    }
+
+    let fileContext: string | undefined;
+    if (input.filePath) {
+      await this.assertAuthorized(input.filePath);
+      const parsed = await parseDocument(input.filePath);
+      fileContext = `${path.basename(input.filePath)}:\n${parsed.text.slice(0, 50_000)}`;
+    }
+
+    await this.audit.write('agent_run_started', 'info', 'Avvio run agente Max', { hasFileContext: Boolean(fileContext) });
+    await this.engine.run(message, fileContext, emit);
+    this.connection = 'connected';
+    await this.config.update({ lastSyncAt: new Date().toISOString() });
+  }
+
+  cancelAgent(): void {
+    this.engine.cancel();
+  }
+
+  resetAgent(): void {
+    this.engine.reset();
+  }
+
+  /** Explorer: list a directory, or the authorized roots when no path is given. */
+  async explore(dirPath?: string): Promise<FsEntry[]> {
+    const config = await this.config.read();
+    if (!dirPath) {
+      const roots = [config.workspacePath, ...config.authorizedFolders];
+      return Promise.all(roots.map(async (root) => toFsEntry(root, 'dir')));
+    }
+    await this.assertAuthorized(dirPath);
+    const entries: FsEntry[] = [];
+    for (const entry of await readdir(dirPath, { withFileTypes: true })) {
+      entries.push(await toFsEntry(path.join(dirPath, entry.name), entry.isDirectory() ? 'dir' : 'file'));
+    }
+    return entries.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'dir' ? -1 : 1));
+  }
+
+  async readFileText(filePath: string): Promise<FileContent> {
+    await this.assertAuthorized(filePath);
+    const details = await stat(filePath);
+    const handle = await readFile(filePath);
+    const truncated = handle.length > MAX_READ_BYTES;
+    return { path: filePath, text: handle.subarray(0, MAX_READ_BYTES).toString('utf8'), truncated: truncated || details.size > MAX_READ_BYTES };
+  }
+
+  async writeFileText(filePath: string, text: string): Promise<void> {
+    await this.assertAuthorized(filePath);
+    await writeFile(filePath, text, 'utf8');
+    await this.audit.write('file_edited', 'security', 'File modificato dall\'editor', { filename: path.basename(filePath) });
+  }
+
   private async assertAuthorized(filePath: string): Promise<void> {
     const canonical = await realpath(filePath);
     const config = await this.config.read();
@@ -335,6 +401,24 @@ async function toLocalFile(filePath: string, source: LocalFile['source']): Promi
     size: details.size,
     modifiedAt: details.mtime.toISOString(),
     source,
+  };
+}
+
+async function toFsEntry(fullPath: string, kind: FsEntry['kind']): Promise<FsEntry> {
+  let size: number | undefined;
+  let modifiedAt: string | undefined;
+  try {
+    const details = await stat(fullPath);
+    size = kind === 'file' ? details.size : undefined;
+    modifiedAt = details.mtime.toISOString();
+  } catch { /* path may be unavailable */ }
+  return {
+    name: path.basename(fullPath),
+    path: fullPath,
+    kind,
+    size,
+    modifiedAt,
+    extension: kind === 'file' ? path.extname(fullPath).slice(1).toLowerCase() : undefined,
   };
 }
 

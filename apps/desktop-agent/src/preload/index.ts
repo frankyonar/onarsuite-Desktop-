@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { ChatRequest, FileAction, MaxDesktopApi, PairingInput } from '../shared/types';
+import type { AgentRunInput, AgentStreamEvent, ChatRequest, FileAction, MaxDesktopApi, PairingInput } from '../shared/types';
 
 const api: MaxDesktopApi = {
   getSnapshot: () => ipcRenderer.invoke('app:snapshot'),
@@ -19,6 +19,16 @@ const api: MaxDesktopApi = {
   syncNow: () => ipcRenderer.invoke('sync:now'),
   clearLocalData: () => ipcRenderer.invoke('app:clear-local-data'),
   sendChat: (input: ChatRequest) => ipcRenderer.invoke('chat:send', input),
+  runAgent: (input: AgentRunInput) => ipcRenderer.invoke('agent:run', input),
+  cancelAgent: () => ipcRenderer.invoke('agent:cancel'),
+  onAgentEvent: (callback: (event: AgentStreamEvent) => void) => {
+    const listener = (_event: unknown, payload: AgentStreamEvent): void => callback(payload);
+    ipcRenderer.on('agent:event', listener);
+    return () => ipcRenderer.removeListener('agent:event', listener);
+  },
+  explore: (dirPath?: string) => ipcRenderer.invoke('fs:explore', dirPath),
+  readFileText: (filePath: string) => ipcRenderer.invoke('fs:read', filePath),
+  writeFileText: (filePath: string, text: string) => ipcRenderer.invoke('fs:write', filePath, text),
 };
 
 contextBridge.exposeInMainWorld('maxDesktop', api);

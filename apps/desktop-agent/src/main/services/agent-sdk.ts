@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { APP_VERSION, type ChatMessage, type PairingInput, type PairingResponse } from '../../shared/types';
+import { APP_VERSION, type AgentMessage, type ChatMessage, type PairingInput, type PairingResponse } from '../../shared/types';
 
 export class AgentSdk {
   constructor(
@@ -58,6 +58,20 @@ export class AgentSdk {
       }),
       headers: { 'Idempotency-Key': idempotencyKey },
     });
+  }
+
+  /** One tool-calling step. The server runs inference; we execute tools locally. */
+  async agentStep(
+    agentSystem: string,
+    messages: AgentMessage[],
+    tools: object[],
+  ): Promise<{ message: AgentMessage; finishReason?: string }> {
+    const result = await this.request<{ message: AgentMessage; finish_reason?: string }>('/api/max/desktop/agent', {
+      method: 'POST',
+      body: JSON.stringify({ agent_system: agentSystem, messages, tools }),
+    });
+    if (!result.message) throw new Error('Risposta agente non valida da OnarSuite.');
+    return { message: result.message, finishReason: result.finish_reason };
   }
 
   async chat(deviceId: string, message: string, history: ChatMessage[], fileContext?: { filename: string; text: string }): Promise<string> {

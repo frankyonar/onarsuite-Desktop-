@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import type { ConnectionState } from '../../shared/types';
+import type { ConnectionState, ToolName } from '../../shared/types';
 
 /** Renders chat content as Markdown with GFM tables/lists and syntax-highlighted
  *  code blocks — handles any text, code or formatting Max returns. */
@@ -44,4 +44,32 @@ export function StatusPill({ state }: { state: ConnectionState }) {
 
 export function EmptyState({ icon, title, children, action }: { icon: string; title: string; children: ReactNode; action?: ReactNode }) {
   return <div className="empty-state"><span className="empty-icon">{icon}</span><h3>{title}</h3><p>{children}</p>{action}</div>;
+}
+
+const toolIcons: Record<ToolName, string> = {
+  read_file: '▤', list_dir: '▸', search_files: '⌕', write_file: '✎', edit_file: '✎',
+  create_file: '＋', delete_file: '⌫', run_shell: '❯', onar_action: '◆',
+};
+
+/** A Claude-Code-style tool-call card: action, monospace command, status and an
+ *  expandable result (diff or shell output). The visual centerpiece of a run. */
+export function ToolCard({ tool, title, command, status, preview, isDiff }: { tool: ToolName; title: string; command: string; status: 'running' | 'done' | 'error'; preview?: string; isDiff?: boolean }) {
+  return (
+    <div className={`tool-card status-${status}`}>
+      <div className="tool-card-head">
+        <span className={`tool-icon tool-${tool}`}>{toolIcons[tool] ?? '◇'}</span>
+        <span className="tool-title">{title}</span>
+        <code className="tool-cmd">{command}</code>
+        <span className={`tool-state ${status}`}>{status === 'running' ? <i className="spin" /> : status === 'done' ? '✓' : '✗'}</span>
+      </div>
+      {preview && (
+        <details className="tool-result" open={status === 'error'}>
+          <summary>Risultato</summary>
+          {isDiff
+            ? <pre className="diff">{preview.split('\n').map((line, i) => <span key={i} className={line.startsWith('+') ? 'diff-add' : line.startsWith('-') ? 'diff-del' : ''}>{line}{'\n'}</span>)}</pre>
+            : <pre>{preview}</pre>}
+        </details>
+      )}
+    </div>
+  );
 }

@@ -1,25 +1,66 @@
-export const APP_VERSION = '0.4.0';
+export const APP_VERSION = '0.5.0';
 
+/** Capabilities Max can use autonomously inside authorized folders. */
 export const MVP_SCOPES = [
   'files:read',
-  'files:write_workspace',
+  'files:write',
+  'files:edit_existing',
+  'files:create',
+  'files:delete',
   'files:upload',
+  'system:shell',
   'crm:create_draft',
   'quotes:create_draft',
   'tasks:create',
 ] as const;
 
+/** Hard limits that remain off even in autonomous mode. */
 export const BLOCKED_SCOPES = [
   'email:send',
   'payments:create_link',
-  'desktop:apps',
-  'system:shell',
-  'files:modify_existing',
+  'files:outside_allowlist',
 ] as const;
 
 export type ConnectionState = 'connected' | 'offline' | 'not_paired' | 'revoked' | 'error';
 export type LogLevel = 'info' | 'warning' | 'error' | 'security';
 export type FileAction = 'upload' | 'create_task' | 'create_customer_draft' | 'create_quote_draft';
+
+/** Local tools Max can call during an agent run. */
+export type ToolName =
+  | 'read_file'
+  | 'list_dir'
+  | 'search_files'
+  | 'write_file'
+  | 'edit_file'
+  | 'create_file'
+  | 'delete_file'
+  | 'run_shell'
+  | 'onar_action';
+
+/** OpenAI-style message used inside the agent loop. */
+export interface AgentMessage {
+  role: 'user' | 'assistant' | 'tool';
+  content?: string | null;
+  tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
+  tool_call_id?: string;
+  name?: string;
+}
+
+/** Events streamed from the agent loop (main) to the console (renderer). */
+export type AgentStreamEvent =
+  | { type: 'status'; runId: string; text: string }
+  | { type: 'assistant'; runId: string; text: string }
+  | { type: 'tool_start'; runId: string; id: string; tool: ToolName; title: string; command: string }
+  | { type: 'tool_end'; runId: string; id: string; ok: boolean; preview: string; isDiff?: boolean }
+  | { type: 'done'; runId: string }
+  | { type: 'error'; runId: string; message: string };
+
+export interface AgentRunInput {
+  message: string;
+  /** Prior plain chat turns shown in the console, for continuity. */
+  history: ChatMessage[];
+  filePath?: string;
+}
 
 export interface PairingInput {
   serverUrl: string;
@@ -100,6 +141,22 @@ export interface ChatResult {
   message: ChatMessage;
 }
 
+/** A filesystem entry returned by the explorer (dir listing). */
+export interface FsEntry {
+  name: string;
+  path: string;
+  kind: 'dir' | 'file';
+  size?: number;
+  modifiedAt?: string;
+  extension?: string;
+}
+
+export interface FileContent {
+  path: string;
+  text: string;
+  truncated: boolean;
+}
+
 export interface MaxDesktopApi {
   getSnapshot(): Promise<AppSnapshot>;
   pair(input: PairingInput): Promise<AppSnapshot>;
@@ -117,4 +174,12 @@ export interface MaxDesktopApi {
   syncNow(): Promise<AppSnapshot>;
   clearLocalData(): Promise<AppSnapshot>;
   sendChat(input: ChatRequest): Promise<ChatResult>;
+  // --- Agent (Claude-Code-like autonomous loop) ---
+  runAgent(input: AgentRunInput): Promise<void>;
+  cancelAgent(): Promise<void>;
+  onAgentEvent(callback: (event: AgentStreamEvent) => void): () => void;
+  // --- File explorer / editor ---
+  explore(dirPath?: string): Promise<FsEntry[]>;
+  readFileText(filePath: string): Promise<FileContent>;
+  writeFileText(filePath: string, text: string): Promise<void>;
 }
