@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FileAction, PairingInput } from '../shared/types';
@@ -22,11 +22,15 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webviewTag: true,
     },
   });
 
   window.on('ready-to-show', () => window.show());
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/.test(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
 
   if (process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL);
@@ -58,11 +62,29 @@ function registerIpc(): void {
   ipcMain.handle('fs:explore', (_event, dirPath?: string) => runtime.explore(dirPath));
   ipcMain.handle('fs:read', (_event, filePath: string) => runtime.readFileText(filePath));
   ipcMain.handle('fs:write', (_event, filePath: string, text: string) => runtime.writeFileText(filePath, text));
+  ipcMain.handle('app:open-external', (_event, url: string) => shell.openExternal(url));
+}
+
+/** Lock down and route the embedded OnarSuite <webview>. */
+function configureWebviews(): void {
+  app.on('web-contents-created', (_event, contents) => {
+    if (contents.getType() !== 'webview') return;
+    // Auth popups (Google OAuth, Stripe, etc.) open as child windows; any
+    // other external link opens in the user's real browser.
+    contents.setWindowOpenHandler(({ url }) => {
+      if (/accounts\.google\.com|oauth|login\.microsoftonline|stripe\.com|paypal\.com|facebook\.com|connect\./i.test(url)) {
+        return { action: 'allow' };
+      }
+      if (/^https?:/.test(url)) void shell.openExternal(url);
+      return { action: 'deny' };
+    });
+  });
 }
 
 app.whenReady().then(async () => {
   app.setAppUserModelId('com.onarsuite.desktop');
   registerIpc();
+  configureWebviews();
   createWindow();
   try {
     await runtime.initialize();

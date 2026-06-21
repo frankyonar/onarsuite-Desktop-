@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, FsEntry, LocalFile, PairingInput, ToolName } from '../../shared/types';
 import { BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import { BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard, Wordmark } from './components';
 
-type View = 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
+type View = 'onarsuite' | 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
 type Theme = 'light' | 'dark';
 
 type ConsoleItem =
@@ -25,6 +25,7 @@ function useTheme(): [Theme, () => void] {
 }
 
 const navItems: Array<{ id: View; label: string; icon: string }> = [
+  { id: 'onarsuite', label: 'OnarSuite', icon: '◎' },
   { id: 'agent', label: 'Agente Max', icon: '◆' },
   { id: 'explorer', label: 'Esplora file', icon: '▤' },
   { id: 'dashboard', label: 'Panoramica', icon: '⌂' },
@@ -36,7 +37,7 @@ const navItems: Array<{ id: View; label: string; icon: string }> = [
 export function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot>();
   const [startupError, setStartupError] = useState<string>();
-  const [view, setView] = useState<View>('agent');
+  const [view, setView] = useState<View>('onarsuite');
   const [files, setFiles] = useState<LocalFile[]>([]);
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [selected, setSelected] = useState<LocalFile>();
@@ -109,6 +110,7 @@ export function App() {
         </div>
       </header>
       {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
+      {view === 'onarsuite' && <WebAppView serverUrl={snapshot.serverUrl} />}
       {view === 'agent' && <AgentConsole files={files} selected={selected} onSelectFile={setSelected} onAfterRun={() => void refresh()} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
       {view === 'dashboard' && <Dashboard snapshot={snapshot} files={files} logs={logs} onGoAgent={() => setView('agent')} onSync={() => run(() => window.maxDesktop.syncNow())} />}
@@ -223,6 +225,42 @@ function reduceEvent(prev: ConsoleItem[], event: AgentStreamEvent): ConsoleItem[
   }
 }
 
+function WebAppView({ serverUrl }: { serverUrl: string }) {
+  const ref = useRef<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [nav, setNav] = useState<{ back: boolean; fwd: boolean; url: string }>({ back: false, fwd: false, url: serverUrl });
+
+  useEffect(() => {
+    const wv = ref.current;
+    if (!wv) return;
+    const onStart = () => setLoading(true);
+    const sync = () => { try { setNav({ back: wv.canGoBack(), fwd: wv.canGoForward(), url: wv.getURL() }); } catch { /* not ready */ } setLoading(false); };
+    wv.addEventListener('did-start-loading', onStart);
+    wv.addEventListener('did-stop-loading', sync);
+    wv.addEventListener('did-navigate', sync);
+    wv.addEventListener('did-navigate-in-page', sync);
+    return () => {
+      wv.removeEventListener('did-start-loading', onStart);
+      wv.removeEventListener('did-stop-loading', sync);
+      wv.removeEventListener('did-navigate', sync);
+      wv.removeEventListener('did-navigate-in-page', sync);
+    };
+  }, []);
+
+  const wv = () => ref.current;
+  return <div className="webapp">
+    <div className="webapp-bar">
+      <button onClick={() => wv()?.goBack()} disabled={!nav.back} title="Indietro">‹</button>
+      <button onClick={() => wv()?.goForward()} disabled={!nav.fwd} title="Avanti">›</button>
+      <button onClick={() => wv()?.reload()} title="Ricarica">⟳</button>
+      <button onClick={() => wv()?.loadURL(serverUrl)} title="Home OnarSuite">⌂</button>
+      <span className="webapp-url">{loading ? 'Caricamento…' : nav.url}</span>
+      <button onClick={() => void window.maxDesktop.openExternal(nav.url)} title="Apri nel browser">↗</button>
+    </div>
+    {createElement('webview', { ref, className: 'webapp-frame', src: serverUrl, partition: 'persist:onarsuite', allowpopups: 'true' } as Record<string, unknown>)}
+  </div>;
+}
+
 function ExplorerView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void }) {
   const [stack, setStack] = useState<string[]>([]);
   const [entries, setEntries] = useState<FsEntry[]>([]);
@@ -285,7 +323,7 @@ function LogsView({ logs }: { logs: AuditEntry[] }) { return <Card title="Regist
 
 function SettingsView({ snapshot, busy, onDisconnect, onClear }: { snapshot: AppSnapshot; busy: boolean; onDisconnect: () => void; onClear: () => void }) { return <div className="page-grid settings-grid"><Card title="Dispositivo"><dl><dt>Nome</dt><dd>{snapshot.deviceName}</dd><dt>ID dispositivo</dt><dd>{snapshot.deviceId}</dd><dt>Server</dt><dd>{snapshot.serverUrl}</dd><dt>Versione</dt><dd>{snapshot.appVersion}</dd><dt>Token locale</dt><dd>{snapshot.encryptionAvailable ? 'Cifrato con il sistema operativo' : 'Non persistito'}</dd></dl><Button variant="danger" disabled={busy} onClick={onDisconnect}>Disconnetti dispositivo</Button></Card><Card title="Privacy e dati locali"><p>Puoi cancellare configurazione, token, coda offline e audit locale. I documenti nelle cartelle autorizzate non vengono eliminati automaticamente.</p><Button variant="secondary" disabled={busy} onClick={onClear}>Cancella dati locali</Button></Card></div>; }
 
-const viewTitles: Record<View, string> = { agent: 'Agente Max', explorer: 'Esplora file', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
+const viewTitles: Record<View, string> = { onarsuite: 'OnarSuite', agent: 'Agente Max', explorer: 'Esplora file', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
 function iconFor(ext?: string) { if (!ext) return '▢'; if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return '▤'; if (['xlsx', 'csv'].includes(ext)) return '▦'; if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) return '▣'; return '◇'; }
 function shortPath(value: string) { const parts = value.split(/[\\/]/); return parts.length > 3 ? `…/${parts.slice(-3).join('/')}` : value; }
 function formatBytes(value: number) { if (value < 1024) return `${value} B`; if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`; return `${(value / 1024 ** 2).toFixed(1)} MB`; }

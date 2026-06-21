@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.6.0';
+export const APP_VERSION = '0.7.0';
 
 /** Capabilities Max can use autonomously inside authorized folders. */
 export const MVP_SCOPES = [
@@ -183,4 +183,5 @@ export interface MaxDesktopApi {
   explore(dirPath?: string): Promise<FsEntry[]>;
   readFileText(filePath: string): Promise<FileContent>;
   writeFileText(filePath: string, text: string): Promise<void>;
+  openExternal(url: string): Promise<void>;
 }

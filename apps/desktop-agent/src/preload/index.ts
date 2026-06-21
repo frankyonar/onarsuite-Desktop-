@@ -29,6 +29,7 @@ const api: MaxDesktopApi = {
   explore: (dirPath?: string) => ipcRenderer.invoke('fs:explore', dirPath),
   readFileText: (filePath: string) => ipcRenderer.invoke('fs:read', filePath),
   writeFileText: (filePath: string, text: string) => ipcRenderer.invoke('fs:write', filePath, text),
+  openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),
 };
 
 contextBridge.exposeInMainWorld('maxDesktop', api);
