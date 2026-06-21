@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, FsEntry, LocalFile, PairingInput, ToolName } from '../../shared/types';
-import { BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
+import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import { BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard, Wordmark } from './components';
 
 type View = 'onarsuite' | 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
@@ -76,6 +76,7 @@ export function App() {
     const timer = window.setInterval(() => void refresh().catch(() => undefined), 30_000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+  useEffect(() => window.maxDesktop.onAuthChanged(() => void refresh().catch(() => undefined)), [refresh]);
 
   const run = async (task: () => Promise<unknown>, success?: string) => {
     setBusy(true); setNotice(undefined);
@@ -129,7 +130,7 @@ function PairingPage({ snapshot, busy, notice, onPair }: { snapshot: AppSnapshot
   const [serverUrl, setServerUrl] = useState(snapshot.serverUrl || 'https://onarsuite.com');
   const [deviceName, setDeviceName] = useState(snapshot.deviceName);
   const [pairingCode, setPairingCode] = useState('');
-  return <div className="pairing-page"><section className="pairing-copy"><BrandMark size={64} /><span className="eyebrow">ONARSUITE · AGENTE MAX</span><h1>Il tuo dipendente digitale,<br />sul tuo computer.</h1><p>Max legge, scrive e modifica i file nelle cartelle che autorizzi, esegue comandi e crea cose in OnarSuite. In autonomia, con ogni azione registrata.</p><div className="trust-list"><span>✓ Accesso solo alle cartelle autorizzate</span><span>✓ Token cifrato dal sistema operativo</span><span>✓ Audit log completo di ogni azione</span></div></section><Card className="pairing-card" eyebrow="PRIMO ACCESSO" title="Collega questo computer">{notice && <div className={`notice notice-${notice.tone}`}>{notice.text}</div>}<form onSubmit={(event) => { event.preventDefault(); onPair({ serverUrl, deviceName, pairingCode: pairingCode || undefined }); }}><label>Server OnarSuite<input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} required /></label><label>Nome dispositivo<input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} required /></label><label>Codice pairing <span>(se richiesto)</span><input value={pairingCode} onChange={(event) => setPairingCode(event.target.value)} /></label><Button disabled={busy}>{busy ? 'Collegamento…' : 'Collega a OnarSuite'}</Button><small className="form-note">La connessione usa HTTPS e può essere revocata da OnarSuite.</small></form></Card></div>;
+  return <div className="pairing-page"><section className="pairing-copy"><BrandMark size={64} /><span className="eyebrow">ONARSUITE · AGENTE MAX</span><h1>Il tuo dipendente digitale,<br />sul tuo computer.</h1><p>Max legge, scrive e modifica i file nelle cartelle che autorizzi, esegue comandi e crea cose in OnarSuite. In autonomia, con ogni azione registrata.</p><div className="trust-list"><span>✓ Accesso solo alle cartelle autorizzate</span><span>✓ Token cifrato dal sistema operativo</span><span>✓ Audit log completo di ogni azione</span></div></section><Card className="pairing-card" eyebrow="PRIMO ACCESSO" title="Collega questo computer">{notice && <div className={`notice notice-${notice.tone}`}>{notice.text}</div>}<label className="pairing-server">Server OnarSuite<input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} required /></label><Button className="web-login-btn" onClick={() => void window.maxDesktop.webLogin(serverUrl, APP_VERSION)}>Accedi con OnarSuite →</Button><small className="form-note">Si apre il browser per il login, poi torni qui in automatico.</small><div className="auth-divider"><span>oppure usa un codice di pairing</span></div><form onSubmit={(event) => { event.preventDefault(); onPair({ serverUrl, deviceName, pairingCode: pairingCode || undefined }); }}><label>Nome dispositivo<input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} required /></label><label>Codice pairing<input value={pairingCode} onChange={(event) => setPairingCode(event.target.value)} /></label><Button variant="secondary" disabled={busy}>{busy ? 'Collegamento…' : 'Collega con codice'}</Button></form></Card></div>;
 }
 
 const SUGGESTIONS = [

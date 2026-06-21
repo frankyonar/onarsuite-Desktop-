@@ -5,11 +5,13 @@ import type { FileAction, PairingInput } from '../shared/types';
 import { DesktopRuntime } from './desktop-runtime';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROTOCOL = 'onarsuite-desktop';
 const runtime = new DesktopRuntime();
+let mainWindow: BrowserWindow | undefined;
 let heartbeatTimer: NodeJS.Timeout | undefined;
 
 function createWindow(): void {
-  const window = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1240,
     height: 820,
     minWidth: 980,
@@ -26,17 +28,25 @@ function createWindow(): void {
     },
   });
 
-  window.on('ready-to-show', () => window.show());
-  window.webContents.setWindowOpenHandler(({ url }) => {
+  mainWindow.on('ready-to-show', () => mainWindow?.show());
+  mainWindow.on('closed', () => { mainWindow = undefined; });
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
-    void window.loadURL(process.env.ELECTRON_RENDERER_URL);
+    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    void window.loadFile(path.join(__dirname, '../renderer/index.html'));
+    void mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
+}
+
+function focusWindow(): void {
+  if (!mainWindow) { createWindow(); return; }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 function registerIpc(): void {
@@ -64,40 +74,78 @@ function registerIpc(): void {
   ipcMain.handle('fs:write', (_event, filePath: string, text: string) => runtime.writeFileText(filePath, text));
   ipcMain.handle('app:open-external', (_event, url: string) => shell.openExternal(url));
   ipcMain.handle('onar:action', (_event, actionType: string, data: Record<string, unknown>) => runtime.onarCall(actionType, data ?? {}));
+  ipcMain.handle('auth:web-login', (_event, serverUrl: string, appVersion: string) => {
+    const base = serverUrl.replace(/\/+$/, '');
+    const url = `${base}/desktop/authorize?platform=${process.platform}&app_version=${encodeURIComponent(appVersion)}`;
+    return shell.openExternal(url);
+  });
 }
 
-/** Lock down and route the embedded OnarSuite <webview>. */
-function configureWebviews(): void {
-  app.on('web-contents-created', (_event, contents) => {
-    if (contents.getType() !== 'webview') return;
-    // Auth popups (Google OAuth, Stripe, etc.) open as child windows; any
-    // other external link opens in the user's real browser.
-    contents.setWindowOpenHandler(({ url }) => {
-      if (/accounts\.google\.com|oauth|login\.microsoftonline|stripe\.com|paypal\.com|facebook\.com|connect\./i.test(url)) {
-        return { action: 'allow' };
-      }
-      if (/^https?:/.test(url)) void shell.openExternal(url);
-      return { action: 'deny' };
+/** Parse the deep-link callback (onarsuite-desktop://auth?token=...) and pair. */
+async function handleDeepLink(url?: string): Promise<void> {
+  if (!url) return;
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return; }
+  if (parsed.protocol !== `${PROTOCOL}:` || parsed.host !== 'auth') return;
+  const token = parsed.searchParams.get('token');
+  const deviceId = parsed.searchParams.get('device_id');
+  if (!token || !deviceId) return;
+  try {
+    await runtime.applyDeepLinkAuth({
+      token,
+      deviceId,
+      deviceUuid: parsed.searchParams.get('device_uuid') ?? undefined,
+      account: parsed.searchParams.get('account') ?? undefined,
+      server: parsed.searchParams.get('server') ?? undefined,
+    });
+    focusWindow();
+    mainWindow?.webContents.send('auth:changed');
+  } catch (error) {
+    console.error('Deep link auth failed', error);
+  }
+}
+
+function extractDeepLink(argv: string[]): string | undefined {
+  return argv.find((arg) => arg.startsWith(`${PROTOCOL}://`));
+}
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  // A second launch (e.g. the browser opening the deep link) forwards its argv.
+  app.on('second-instance', (_event, argv) => {
+    focusWindow();
+    void handleDeepLink(extractDeepLink(argv));
+  });
+  // macOS delivers the protocol via open-url.
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    void handleDeepLink(url);
+  });
+
+  app.whenReady().then(async () => {
+    app.setAppUserModelId('com.onarsuite.desktop');
+    if (process.defaultApp && process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
+    } else {
+      app.setAsDefaultProtocolClient(PROTOCOL);
+    }
+    registerIpc();
+    createWindow();
+    try {
+      await runtime.initialize();
+    } catch (error) {
+      console.error('OnarSuite Desktop initialization failed', error);
+    }
+    heartbeatTimer = setInterval(() => void runtime.syncNow(), 60_000);
+    // Windows cold-start via protocol delivers the URL in argv.
+    void handleDeepLink(extractDeepLink(process.argv));
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
   });
 }
-
-app.whenReady().then(async () => {
-  app.setAppUserModelId('com.onarsuite.desktop');
-  registerIpc();
-  configureWebviews();
-  createWindow();
-  try {
-    await runtime.initialize();
-  } catch (error) {
-    console.error('Max Desktop initialization failed', error);
-  }
-  heartbeatTimer = setInterval(() => void runtime.syncNow(), 60_000);
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
 
 app.on('before-quit', () => {
   if (heartbeatTimer) clearInterval(heartbeatTimer);

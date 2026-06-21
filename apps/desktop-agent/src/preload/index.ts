@@ -31,6 +31,12 @@ const api: MaxDesktopApi = {
   writeFileText: (filePath: string, text: string) => ipcRenderer.invoke('fs:write', filePath, text),
   openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),
   onar: (actionType: string, data: Record<string, unknown>) => ipcRenderer.invoke('onar:action', actionType, data),
+  webLogin: (serverUrl: string, appVersion: string) => ipcRenderer.invoke('auth:web-login', serverUrl, appVersion),
+  onAuthChanged: (callback: () => void) => {
+    const listener = (): void => callback();
+    ipcRenderer.on('auth:changed', listener);
+    return () => ipcRenderer.removeListener('auth:changed', listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('maxDesktop', api);

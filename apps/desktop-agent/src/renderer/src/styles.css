@@ -302,6 +302,10 @@ h1, h2, h3, .brand strong { font-family: var(--font-display); font-weight: 600; 
 .pairing-card label { color: var(--ink); font-size: 12px; font-weight: 500; } .pairing-card label span { color: var(--muted); font-weight: 400; }
 .pairing-card input { width: 100%; height: 45px; margin-top: 7px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 12px; outline: none; background: var(--glass-strong); } .pairing-card input:focus { border-color: var(--ring); box-shadow: 0 0 0 3px rgba(59,130,246,.18); }
 .form-note { color: var(--muted); text-align: center; }
+.web-login-btn { width: 100%; }
+.pairing-server { display: block; margin-bottom: 14px; }
+.auth-divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 4px; color: var(--faint); font-size: 11px; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* ---- Agent console (Claude-Code-style transcript) ---- */
 .console { min-height: calc(100vh - 132px); display: grid; grid-template-rows: 1fr auto; overflow: hidden; border-radius: var(--radius); }

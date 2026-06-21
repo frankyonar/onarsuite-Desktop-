@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.8.0';
+export const APP_VERSION = '0.9.0';
 
 /** Capabilities Max can use autonomously inside authorized folders. */
 export const MVP_SCOPES = [
@@ -185,6 +185,8 @@ export interface MaxDesktopApi {
   writeFileText(filePath: string, text: string): Promise<void>;
   openExternal(url: string): Promise<void>;
   onar(actionType: string, data: Record<string, unknown>): Promise<OnarResult>;
+  webLogin(serverUrl: string, appVersion: string): Promise<void>;
+  onAuthChanged(callback: () => void): () => void;
 }
 
 export interface OnarResult {

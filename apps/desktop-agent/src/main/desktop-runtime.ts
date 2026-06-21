@@ -91,6 +91,22 @@ export class DesktopRuntime {
     return this.snapshot();
   }
 
+  /** Store the token/device received from the web deep-link login. */
+  async applyDeepLinkAuth(params: { token: string; deviceId: string; deviceUuid?: string; account?: string; server?: string }): Promise<void> {
+    if (params.server) {
+      try { validateHttpsUrl(params.server); await this.config.update({ serverUrl: params.server.replace(/\/+$/, '') }); } catch { /* keep configured server */ }
+    }
+    const tokenSaved = await this.config.saveToken(params.token);
+    await this.config.update({
+      deviceId: params.deviceId,
+      deviceUuid: params.deviceUuid,
+      accountLabel: params.account,
+    });
+    this.connection = 'connected';
+    await this.audit.write('device_paired', 'security', 'Collegato a OnarSuite via login web', { deviceId: params.deviceId, tokenPersisted: tokenSaved });
+    await this.heartbeat();
+  }
+
   async disconnect(): Promise<AppSnapshot> {
     const config = await this.config.read();
     await this.audit.write('device_disconnected', 'security', 'Pairing locale rimosso', { deviceId: config.deviceId ?? null });
