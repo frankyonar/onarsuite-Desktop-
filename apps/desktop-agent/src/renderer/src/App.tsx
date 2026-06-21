@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
-import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, FsEntry, LocalFile, PairingInput, ToolName } from '../../shared/types';
+import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, FsEntry, LocalFile, PairingInput, ToolName, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import { BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard, Wordmark } from './components';
 
-type View = 'onarsuite' | 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
+type View = 'onarsuite' | 'clients' | 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
 type Theme = 'light' | 'dark';
 
 type ConsoleItem =
@@ -25,23 +25,35 @@ function useTheme(): [Theme, () => void] {
 }
 
 const navItems: Array<{ id: View; label: string; icon: string }> = [
-  { id: 'onarsuite', label: 'OnarSuite', icon: '◎' },
-  { id: 'agent', label: 'Agente Max', icon: '◆' },
-  { id: 'explorer', label: 'Esplora file', icon: '▤' },
-  { id: 'dashboard', label: 'Panoramica', icon: '⌂' },
+  { id: 'agent', label: 'Chat Max', icon: '◆' },
+  { id: 'explorer', label: 'File locali', icon: '▤' },
   { id: 'folders', label: 'Cartelle autorizzate', icon: '▱' },
   { id: 'logs', label: 'Attività', icon: '≡' },
-  { id: 'settings', label: 'Impostazioni', icon: '⚙' },
+];
+
+// Secondary "tools" — OnarSuite modules Max can also open, kept below the chat.
+const toolItems: Array<{ id: View; label: string; icon: string }> = [
+  { id: 'onarsuite', label: 'Moduli OnarSuite', icon: '◎' },
+  { id: 'clients', label: 'Clienti', icon: '◈' },
 ];
 
 export function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot>();
   const [startupError, setStartupError] = useState<string>();
-  const [view, setView] = useState<View>('onarsuite');
+  const [view, setView] = useState<View>('agent');
+  const [chatKey, setChatKey] = useState(0);
+
+  const newChat = useCallback(() => {
+    void window.maxDesktop.resetAgent().catch(() => undefined);
+    setChatKey((k) => k + 1);
+    setView('agent');
+  }, []);
   const [files, setFiles] = useState<LocalFile[]>([]);
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [selected, setSelected] = useState<LocalFile>();
   const [busy, setBusy] = useState(false);
+  const [updateBusy, setUpdateBusy] = useState(false);
+  const [updateState, setUpdateState] = useState<UpdateState>({ status: 'idle', currentVersion: APP_VERSION });
   const [notice, setNotice] = useState<{ tone: 'success' | 'error' | 'warning'; text: string }>();
   const [theme, toggleTheme] = useTheme();
   const [sidebarWidth, setSidebarWidth] = useState(() => Number(localStorage.getItem('max-sidebar-w')) || 244);
@@ -77,6 +89,21 @@ export function App() {
     return () => window.clearInterval(timer);
   }, [refresh]);
   useEffect(() => window.maxDesktop.onAuthChanged(() => void refresh().catch(() => undefined)), [refresh]);
+  useEffect(() => {
+    let active = true;
+    void window.maxDesktop.getUpdateState()
+      .then((state) => { if (active) setUpdateState(state); })
+      .catch(() => undefined);
+    void window.maxDesktop.checkForUpdates().catch(() => undefined);
+    const unsubscribe = window.maxDesktop.onUpdateStateChanged((state) => setUpdateState(state));
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+  useEffect(() => {
+    if (updateState.status !== 'checking' && updateState.status !== 'downloading') setUpdateBusy(false);
+  }, [updateState.status]);
 
   const run = async (task: () => Promise<unknown>, success?: string) => {
     setBusy(true); setNotice(undefined);
@@ -91,13 +118,33 @@ export function App() {
     if (paths.length) await run(() => window.maxDesktop.importDroppedFiles(paths), 'File aggiunti alla workspace.');
   };
 
+  const handleUpdateAction = async () => {
+    if (updateBusy) return;
+    setUpdateBusy(true);
+    setNotice(undefined);
+    try {
+      if (updateState.status === 'downloaded') await window.maxDesktop.installUpdate();
+      else if (updateState.status === 'available' || (updateState.status === 'error' && updateState.availableVersion)) await window.maxDesktop.downloadUpdate();
+      else await window.maxDesktop.checkForUpdates();
+    } catch (error) {
+      setNotice({ tone: 'error', text: errorText(error) });
+    } finally {
+      setUpdateBusy(false);
+    }
+  };
+
   if (!snapshot) return <StartupScreen error={startupError} onRetry={() => void refresh().catch((error) => setStartupError(errorText(error)))} />;
   if (snapshot.connection === 'not_paired') return <PairingPage snapshot={snapshot} busy={busy} notice={notice} onPair={(input) => run(() => window.maxDesktop.pair(input))} />;
 
   return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)` }}>
     <aside className="sidebar">
       <div className="brand"><BrandMark size={34} /><div><Wordmark /><span>Agente Max AI</span></div></div>
+      <button className="new-chat" onClick={newChat}><span>＋</span>Nuova chat</button>
       <nav>{navItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}</nav>
+      <div className="nav-divider">Strumenti</div>
+      <nav>{toolItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}
+        <button className={view === 'settings' ? 'active' : ''} onClick={() => setView('settings')}><span>⚙</span>Impostazioni</button>
+      </nav>
       <div className="sidebar-status"><StatusPill state={snapshot.connection} /><small>{snapshot.accountLabel || snapshot.deviceName}</small></div>
       <div className="sidebar-resizer" onMouseDown={startResize} title="Trascina per regolare la larghezza" />
     </aside>
@@ -110,9 +157,11 @@ export function App() {
           <Button variant="secondary" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}>Sincronizza</Button>
         </div>
       </header>
+      <UpdateBanner state={updateState} busy={updateBusy} onAction={handleUpdateAction} />
       {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
-      {view === 'onarsuite' && <OnarHome onNotice={setNotice} onOpenExternal={() => window.maxDesktop.openExternal(snapshot.serverUrl)} />}
-      {view === 'agent' && <AgentConsole files={files} selected={selected} onSelectFile={setSelected} onAfterRun={() => void refresh()} />}
+      {view === 'onarsuite' && <OnarHome onNotice={setNotice} onGoClients={() => setView('clients')} />}
+      {view === 'clients' && <ClientsView />}
+      {view === 'agent' && <AgentConsole key={chatKey} files={files} selected={selected} onSelectFile={setSelected} onAfterRun={() => void refresh()} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
       {view === 'dashboard' && <Dashboard snapshot={snapshot} files={files} logs={logs} onGoAgent={() => setView('agent')} onSync={() => run(() => window.maxDesktop.syncNow())} />}
       {view === 'folders' && <FoldersView snapshot={snapshot} busy={busy} onAdd={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemove={(folder) => run(() => window.maxDesktop.removeAuthorizedFolder(folder))} onDrop={importDrop} onChoose={() => run(() => window.maxDesktop.chooseFiles(), 'File aggiunti alla workspace.')} />}
@@ -126,18 +175,42 @@ function StartupScreen({ error, onRetry }: { error?: string; onRetry: () => void
   return <div className="splash"><BrandMark size={72} /><h2>{error ? 'OnarSuite non è riuscito ad avviarsi' : 'Avvio di OnarSuite…'}</h2>{error && <><p className="startup-error">{error}</p><Button onClick={onRetry}>Riprova</Button></>}</div>;
 }
 
+const ONAR_SERVER = 'https://onarsuite.com';
+
 function PairingPage({ snapshot, busy, notice, onPair }: { snapshot: AppSnapshot; busy: boolean; notice?: { tone: string; text: string }; onPair: (input: PairingInput) => void }) {
-  const [serverUrl, setServerUrl] = useState(snapshot.serverUrl || 'https://onarsuite.com');
-  const [deviceName, setDeviceName] = useState(snapshot.deviceName);
   const [pairingCode, setPairingCode] = useState('');
-  return <div className="pairing-page"><section className="pairing-copy"><BrandMark size={64} /><span className="eyebrow">ONARSUITE · AGENTE MAX</span><h1>Il tuo dipendente digitale,<br />sul tuo computer.</h1><p>Max legge, scrive e modifica i file nelle cartelle che autorizzi, esegue comandi e crea cose in OnarSuite. In autonomia, con ogni azione registrata.</p><div className="trust-list"><span>✓ Accesso solo alle cartelle autorizzate</span><span>✓ Token cifrato dal sistema operativo</span><span>✓ Audit log completo di ogni azione</span></div></section><Card className="pairing-card" eyebrow="PRIMO ACCESSO" title="Collega questo computer">{notice && <div className={`notice notice-${notice.tone}`}>{notice.text}</div>}<label className="pairing-server">Server OnarSuite<input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} required /></label><Button className="web-login-btn" onClick={() => void window.maxDesktop.webLogin(serverUrl, APP_VERSION)}>Accedi con OnarSuite →</Button><small className="form-note">Si apre il browser per il login, poi torni qui in automatico.</small><div className="auth-divider"><span>oppure usa un codice di pairing</span></div><form onSubmit={(event) => { event.preventDefault(); onPair({ serverUrl, deviceName, pairingCode: pairingCode || undefined }); }}><label>Nome dispositivo<input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} required /></label><label>Codice pairing<input value={pairingCode} onChange={(event) => setPairingCode(event.target.value)} /></label><Button variant="secondary" disabled={busy}>{busy ? 'Collegamento…' : 'Collega con codice'}</Button></form></Card></div>;
+  // Server is fixed; device name is generated in the background (never shown).
+  const deviceName = snapshot.deviceName || 'OnarSuite Desktop';
+  return <div className="pairing-page">
+    <section className="pairing-copy">
+      <BrandMark size={64} />
+      <span className="eyebrow">ONARSUITE · AGENTE MAX</span>
+      <h1>Il tuo dipendente digitale,<br />sul tuo computer.</h1>
+      <p>Max lavora con i dati di OnarSuite e con i file locali che autorizzi.</p>
+      <div className="trust-list">
+        <span>✓ Accesso solo alle cartelle autorizzate</span>
+        <span>✓ Token protetto dal sistema operativo</span>
+        <span>✓ Ogni azione importante viene registrata</span>
+      </div>
+    </section>
+    <Card className="pairing-card" title="Collega questo computer">
+      {notice && <div className={`notice notice-${notice.tone}`}>{notice.text}</div>}
+      <Button className="web-login-btn" onClick={() => void window.maxDesktop.webLogin(ONAR_SERVER, APP_VERSION)}>Accedi con OnarSuite →</Button>
+      <small className="form-note">Si apre il browser per il login, poi torni qui in automatico.</small>
+      <div className="auth-divider"><span>oppure usa un codice di pairing</span></div>
+      <form onSubmit={(event) => { event.preventDefault(); onPair({ serverUrl: ONAR_SERVER, deviceName, pairingCode: pairingCode || undefined }); }}>
+        <label>Codice pairing<input value={pairingCode} onChange={(event) => setPairingCode(event.target.value)} placeholder="es. 7F3A9C" autoFocus /></label>
+        <Button variant="secondary" disabled={busy || !pairingCode.trim()}>{busy ? 'Collegamento…' : 'Collega con codice'}</Button>
+      </form>
+    </Card>
+  </div>;
 }
 
 const SUGGESTIONS = [
-  'Riordina e rinomina i file nella workspace',
-  'Leggi l’ultimo contratto e crea un task di follow-up',
-  'Cerca “scadenza” nei documenti e riassumi',
-  'Genera un README per questa cartella',
+  'Crea un nuovo cliente',
+  'Cerca un file sul computer',
+  'Prepara un preventivo',
+  'Mostrami le attività di oggi',
 ];
 
 function AgentConsole({ files, selected, onSelectFile, onAfterRun }: { files: LocalFile[]; selected?: LocalFile; onSelectFile: (file?: LocalFile) => void; onAfterRun: () => void }) {
@@ -175,11 +248,10 @@ function AgentConsole({ files, selected, onSelectFile, onAfterRun }: { files: Lo
   return <div className="console">
     <div className="console-stream" ref={streamRef}>
       {items.length === 0 && !running ? <div className="chat-welcome">
-        <BrandMark size={64} />
-        <span className="eyebrow">AGENTE AUTONOMO · MAX AI</span>
-        <h2>Cosa faccio per te oggi?</h2>
-        <p>Dammi un obiettivo. Leggo i file, eseguo comandi e creo cose in OnarSuite per portarlo a termine — da solo.</p>
-        <div className="prompt-grid">{SUGGESTIONS.map((prompt) => <button key={prompt} onClick={() => void send(prompt)}>{prompt}<span>→</span></button>)}</div>
+        <BrandMark size={60} />
+        <h2>Ciao, sono Max</h2>
+        <p>Posso aiutarti a lavorare su OnarSuite e sui file di questo computer. Chiedimi di creare clienti, preventivi, fatture, contratti, cercare documenti o collegare file locali.</p>
+        <div className="prompt-pills">{SUGGESTIONS.map((prompt) => <button key={prompt} onClick={() => void send(prompt)}>{prompt}</button>)}</div>
       </div> : items.map((item) => <ConsoleRow key={item.id} item={item} />)}
       {running && <div className="agent-indicator"><span className="dots"><i /><i /><i /></span>{status || 'Max sta lavorando…'}</div>}
     </div>
@@ -269,12 +341,12 @@ const COMING: Array<{ label: string; icon: string; hint: string }> = [
   { label: 'Ticket', icon: '◫', hint: 'Assistenza' },
 ];
 
-function OnarHome({ onNotice, onOpenExternal }: { onNotice: (n: Notice) => void; onOpenExternal: () => void }) {
+function OnarHome({ onNotice, onGoClients }: { onNotice: (n: Notice) => void; onGoClients: () => void }) {
   const [moduleId, setModuleId] = useState<string>();
   const def = MODULES.find((m) => m.id === moduleId);
   if (def) return <ModuleScreen def={def} onBack={() => setModuleId(undefined)} onNotice={onNotice} />;
   return <div className="onar-home">
-    <Card className="onar-banner"><div><span className="eyebrow">GESTIONALE NATIVO</span><h2>Gestisci OnarSuite dall’app</h2><p>Moduli nativi collegati al tuo OnarSuite. Apri un modulo per vedere i dati reali e crearne di nuovi.</p></div><Button variant="secondary" onClick={onOpenExternal}>Apri OnarSuite web ↗</Button></Card>
+    <Card className="onar-banner"><div><span className="eyebrow">GESTIONALE NATIVO</span><h2>OnarSuite Desktop è autonomo</h2><p>Qui lavoriamo solo con schermate native, dati reali e azioni verso il backend. Nessun salto al web: costruiamo i moduli dentro l’app.</p><div className="hero-actions"><Button onClick={onGoClients}>Apri Clienti</Button></div></div></Card>
     <div className="module-grid">
       {MODULES.map((m) => <button key={m.id} className="module-card" onClick={() => setModuleId(m.id)}><span className="module-icon">{m.icon}</span><strong>{m.label}</strong><small>{m.hint}</small></button>)}
       {COMING.map((m) => <div key={m.label} className="module-card disabled"><span className="module-icon">{m.icon}</span><strong>{m.label}</strong><small>{m.hint}</small><span className="soon">in arrivo</span></div>)}
@@ -419,9 +491,183 @@ function LogsView({ logs }: { logs: AuditEntry[] }) { return <Card title="Regist
 
 function SettingsView({ snapshot, busy, onDisconnect, onClear }: { snapshot: AppSnapshot; busy: boolean; onDisconnect: () => void; onClear: () => void }) { return <div className="page-grid settings-grid"><Card title="Dispositivo"><dl><dt>Nome</dt><dd>{snapshot.deviceName}</dd><dt>ID dispositivo</dt><dd>{snapshot.deviceId}</dd><dt>Server</dt><dd>{snapshot.serverUrl}</dd><dt>Versione</dt><dd>{snapshot.appVersion}</dd><dt>Token locale</dt><dd>{snapshot.encryptionAvailable ? 'Cifrato con il sistema operativo' : 'Non persistito'}</dd></dl><Button variant="danger" disabled={busy} onClick={onDisconnect}>Disconnetti dispositivo</Button></Card><Card title="Privacy e dati locali"><p>Puoi cancellare configurazione, token, coda offline e audit locale. I documenti nelle cartelle autorizzate non vengono eliminati automaticamente.</p><Button variant="secondary" disabled={busy} onClick={onClear}>Cancella dati locali</Button></Card></div>; }
 
-const viewTitles: Record<View, string> = { onarsuite: 'OnarSuite', agent: 'Agente Max', explorer: 'Esplora file', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
+function UpdateBanner({ state, busy, onAction }: { state: UpdateState; busy: boolean; onAction: () => void }) {
+  if (state.status === 'disabled' || state.status === 'idle') return null;
+
+  const percent = Math.max(0, Math.min(100, state.percent ?? 0));
+  const title = state.status === 'available'
+    ? `Nuova versione ${state.availableVersion ?? ''} disponibile`
+    : state.status === 'downloading'
+      ? `Scaricamento aggiornamento ${state.availableVersion ?? ''}`
+      : state.status === 'downloaded'
+        ? `Aggiornamento ${state.availableVersion ?? ''} pronto`
+        : state.status === 'checking'
+          ? 'Controllo aggiornamenti in corso'
+          : 'Aggiornamento non riuscito';
+  const message = state.status === 'available'
+    ? 'Scarica l’update e riavvia l’app quando sei pronto.'
+    : state.status === 'downloading'
+      ? `Download in corso${state.totalBytes ? ` · ${percent}%` : ''}`
+      : state.status === 'downloaded'
+        ? 'Riavvia per installare la nuova release.'
+        : state.error || 'Riprova il controllo degli aggiornamenti.';
+  const buttonLabel = state.status === 'downloaded'
+    ? 'Riavvia e installa'
+    : state.status === 'downloading'
+      ? 'Scaricamento...'
+      : state.status === 'checking'
+        ? 'Controllo...'
+        : state.status === 'error'
+          ? 'Riprova'
+          : 'Scarica aggiornamento';
+
+  return (
+    <div className={`update-banner update-${state.status}`}>
+      <div className="update-banner-copy">
+        <span className="eyebrow">AGGIORNAMENTO DISPONIBILE</span>
+        <strong>{title}</strong>
+        <span>{message}</span>
+        {state.status === 'downloading' && (
+          <div className="update-progress" aria-hidden="true">
+            <div style={{ width: `${percent}%` }} />
+          </div>
+        )}
+      </div>
+      <Button variant={state.status === 'downloaded' ? 'primary' : 'secondary'} disabled={busy || state.status === 'checking' || state.status === 'downloading'} onClick={onAction}>
+        {buttonLabel}
+      </Button>
+    </div>
+  );
+}
+
+function ClientsView() {
+  const [users, setUsers] = useState<Array<Record<string, unknown>>>([]);
+  const [leads, setLeads] = useState<Array<Record<string, unknown>>>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [userForm, setUserForm] = useState({ name: '', email: '', type: '' });
+  const [leadForm, setLeadForm] = useState({ name: '', email: '', phone: '', notes: '' });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [usersRes, leadsRes] = await Promise.all([
+      window.maxDesktop.onar('list_users', { limit: 30 }),
+      window.maxDesktop.onar('list_leads', { limit: 30 }),
+    ]);
+    if (usersRes.success) setUsers(((usersRes.data as { users?: Array<Record<string, unknown>> } | undefined)?.users) ?? []);
+    if (leadsRes.success) setLeads(((leadsRes.data as { leads?: Array<Record<string, unknown>> } | undefined)?.leads) ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const submitUser = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    const res = await window.maxDesktop.onar('create_user', {
+      name: userForm.name,
+      email: userForm.email || undefined,
+      type: userForm.type || undefined,
+    });
+    setBusy(false);
+    if (res.success) {
+      setUserForm({ name: '', email: '', type: '' });
+      void load();
+    }
+  };
+
+  const submitLead = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    const res = await window.maxDesktop.onar('create_customer', {
+      name: leadForm.name,
+      email: leadForm.email || undefined,
+      phone: leadForm.phone || undefined,
+      notes: leadForm.notes || undefined,
+    });
+    setBusy(false);
+    if (res.success) {
+      setLeadForm({ name: '', email: '', phone: '', notes: '' });
+      void load();
+    }
+  };
+
+  return (
+    <div className="page-grid clients-grid">
+      <Card
+        title="Clienti"
+        eyebrow="HUB NATIVO"
+      >
+        <p>Qui stiamo portando il cuore CRM di OnarSuite in una versione nativa: utenti interni e clienti/lead, senza uscire dall’app.</p>
+      </Card>
+      <div className="stats-grid">
+        <Card><span className="stat-label">Utenti</span><strong className="stat-value">{users.length}</strong><small>Team e accessi</small></Card>
+        <Card><span className="stat-label">Lead</span><strong className="stat-value">{leads.length}</strong><small>Clienti potenziali</small></Card>
+        <Card><span className="stat-label">Stato</span><strong className="stat-value">Live</strong><small>Dal backend di OnarSuite</small></Card>
+      </div>
+      <div className="clients-columns">
+        <Card title="Utenti">
+          {loading ? <p className="muted-line">Carico utenti...</p> : (
+            <div className="data-table compact">
+              {users.map((user) => (
+                <div key={String(user.id)} className="data-row">
+                  <strong>{String(user.name ?? '—')}</strong>
+                  <span>{String(user.email ?? '—')}</span>
+                  <span>{String(user.type ?? '—')}</span>
+                </div>
+              ))}
+              {!users.length && <EmptyState icon="◌" title="Nessun utente">Non ci sono utenti da mostrare.</EmptyState>}
+            </div>
+          )}
+          <form className="module-form" onSubmit={submitUser}>
+            <label>Nome<input value={userForm.name} onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} required /></label>
+            <label>Email<input value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} /></label>
+            <label>Ruolo / tipo<input value={userForm.type} onChange={(e) => setUserForm({ ...userForm, type: e.target.value })} /></label>
+            <Button disabled={busy}>{busy ? 'Salvataggio...' : 'Crea utente'}</Button>
+          </form>
+        </Card>
+        <Card title="Lead / anagrafiche">
+          {loading ? <p className="muted-line">Carico clienti...</p> : (
+            <div className="data-table compact">
+              {leads.map((lead) => (
+                <div key={String(lead.id)} className="data-row">
+                  <strong>{String(lead.name ?? '—')}</strong>
+                  <span>{String(lead.email ?? '—')}</span>
+                  <span>{String(lead.phone ?? '—')}</span>
+                </div>
+              ))}
+              {!leads.length && <EmptyState icon="◉" title="Nessun lead">Non ci sono lead da mostrare.</EmptyState>}
+            </div>
+          )}
+          <form className="module-form" onSubmit={submitLead}>
+            <label>Nome<input value={leadForm.name} onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })} required /></label>
+            <label>Email<input value={leadForm.email} onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })} /></label>
+            <label>Telefono<input value={leadForm.phone} onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })} /></label>
+            <label>Note<textarea value={leadForm.notes} onChange={(e) => setLeadForm({ ...leadForm, notes: e.target.value })} rows={3} /></label>
+            <Button disabled={busy}>{busy ? 'Salvataggio...' : 'Crea lead'}</Button>
+          </form>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+const viewTitles: Record<View, string> = { onarsuite: 'OnarSuite', clients: 'Clienti', agent: 'Agente Max', explorer: 'Esplora file', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
 function iconFor(ext?: string) { if (!ext) return '▢'; if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return '▤'; if (['xlsx', 'csv'].includes(ext)) return '▦'; if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) return '▣'; return '◇'; }
 function shortPath(value: string) { const parts = value.split(/[\\/]/); return parts.length > 3 ? `…/${parts.slice(-3).join('/')}` : value; }
 function formatBytes(value: number) { if (value < 1024) return `${value} B`; if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`; return `${(value / 1024 ** 2).toFixed(1)} MB`; }
 function formatDate(value: string) { return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
-function errorText(error: unknown) { return error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : 'Errore imprevisto.'; }
+function errorText(error: unknown) {
+  if (!(error instanceof Error)) return 'Errore imprevisto.';
+  let msg = error.message.replace(/^Error invoking remote method '[^']+': Error: /, '');
+  // Never surface raw JSON / HTTP status to the user — extract the message field.
+  const jsonStart = msg.indexOf('{');
+  if (jsonStart >= 0) {
+    try {
+      const parsed = JSON.parse(msg.slice(jsonStart));
+      msg = parsed.message || parsed.error || msg.slice(0, jsonStart).trim();
+    } catch { msg = msg.slice(0, jsonStart).trim() || msg; }
+  }
+  msg = msg.replace(/^OnarSuite ha risposto \d+:\s*/, '').trim();
+  return msg || 'Si è verificato un errore.';
+}

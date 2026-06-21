@@ -1,6 +1,6 @@
 {
   "name": "@onarsuite/max-desktop",
-  "version": "0.9.0",
+  "version": "0.9.5",
   "private": true,
   "description": "OnarSuite - agente desktop locale sicuro con Max AI",
   "main": "out/main/index.js",
@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "highlight.js": "^11.11.1",
     "mammoth": "^1.10.0",
     "pdf-parse": "^1.1.1",
@@ -57,6 +58,13 @@
         "nsis"
       ]
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "frankyonar",
+        "repo": "Max-Desktop"
+      }
+    ],
     "mac": {
       "icon": "build/icon.png",
       "target": [

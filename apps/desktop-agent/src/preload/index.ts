@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { AgentRunInput, AgentStreamEvent, ChatRequest, FileAction, MaxDesktopApi, PairingInput } from '../shared/types';
+import type { AgentRunInput, AgentStreamEvent, ChatRequest, FileAction, MaxDesktopApi, PairingInput, UpdateState } from '../shared/types';
 
 const api: MaxDesktopApi = {
   getSnapshot: () => ipcRenderer.invoke('app:snapshot'),
@@ -18,9 +18,19 @@ const api: MaxDesktopApi = {
   listAudit: () => ipcRenderer.invoke('audit:list'),
   syncNow: () => ipcRenderer.invoke('sync:now'),
   clearLocalData: () => ipcRenderer.invoke('app:clear-local-data'),
+  getUpdateState: () => ipcRenderer.invoke('update:get-state'),
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateStateChanged: (callback: (state: UpdateState) => void) => {
+    const listener = (_event: unknown, payload: UpdateState): void => callback(payload);
+    ipcRenderer.on('update:state-changed', listener);
+    return () => ipcRenderer.removeListener('update:state-changed', listener);
+  },
   sendChat: (input: ChatRequest) => ipcRenderer.invoke('chat:send', input),
   runAgent: (input: AgentRunInput) => ipcRenderer.invoke('agent:run', input),
   cancelAgent: () => ipcRenderer.invoke('agent:cancel'),
+  resetAgent: () => ipcRenderer.invoke('agent:reset'),
   onAgentEvent: (callback: (event: AgentStreamEvent) => void) => {
     const listener = (_event: unknown, payload: AgentStreamEvent): void => callback(payload);
     ipcRenderer.on('agent:event', listener);

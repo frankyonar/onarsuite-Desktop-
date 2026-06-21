@@ -1,7 +1,7 @@
-import type { AgentStreamEvent, AppSnapshot, AuditEntry, FsEntry, LocalFile, MaxDesktopApi } from '../../shared/types';
+import type { AgentStreamEvent, AppSnapshot, AuditEntry, FsEntry, LocalFile, MaxDesktopApi, UpdateState } from '../../shared/types';
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.0', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.5', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -36,6 +36,8 @@ const fileText: Record<string, string> = {
   'preview/workspace/contratto.html': '<h1>Contratto di servizio</h1>\n<p>Tra le parti…</p>\n',
 };
 
+const updateState: UpdateState = { status: 'disabled', currentVersion: snapshot.appVersion };
+
 export function createPreviewApi(): MaxDesktopApi {
   const initialSnapshot = new URLSearchParams(location.search).has('unpaired')
     ? { ...snapshot, deviceId: undefined, connection: 'not_paired' as const }
@@ -62,6 +64,11 @@ export function createPreviewApi(): MaxDesktopApi {
     listAudit: async () => logs,
     syncNow: async () => snapshot,
     clearLocalData: async () => snapshot,
+    getUpdateState: async () => updateState,
+    checkForUpdates: async () => updateState,
+    downloadUpdate: async () => updateState,
+    installUpdate: async () => undefined,
+    onUpdateStateChanged: () => () => undefined,
     sendChat: async () => ({ message: { id: crypto.randomUUID(), role: 'assistant', content: 'Ho analizzato il documento.', createdAt: new Date().toISOString() } }),
     runAgent: async (input) => {
       const runId = 'preview';
@@ -87,6 +94,7 @@ export function createPreviewApi(): MaxDesktopApi {
       void input;
     },
     cancelAgent: async () => { canceled = true; },
+    resetAgent: async () => undefined,
     onAgentEvent: (callback) => { listeners.add(callback); return () => listeners.delete(callback); },
     explore: async (dirPath) => tree[dirPath ?? ''] ?? [],
     readFileText: async (filePath) => ({ path: filePath, text: fileText[filePath] ?? '// File non disponibile in anteprima.', truncated: false }),

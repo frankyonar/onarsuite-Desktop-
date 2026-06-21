@@ -1,4 +1,16 @@
-export const APP_VERSION = '0.9.0';
+export const APP_VERSION = '0.9.5';
+
+export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
+
+export interface UpdateState {
+  status: UpdateStatus;
+  currentVersion: string;
+  availableVersion?: string;
+  percent?: number;
+  transferredBytes?: number;
+  totalBytes?: number;
+  error?: string;
+}
 
 /** Capabilities Max can use autonomously inside authorized folders. */
 export const MVP_SCOPES = [
@@ -174,10 +186,16 @@ export interface MaxDesktopApi {
   listAudit(): Promise<AuditEntry[]>;
   syncNow(): Promise<AppSnapshot>;
   clearLocalData(): Promise<AppSnapshot>;
+  getUpdateState(): Promise<UpdateState>;
+  checkForUpdates(): Promise<UpdateState>;
+  downloadUpdate(): Promise<UpdateState>;
+  installUpdate(): Promise<void>;
+  onUpdateStateChanged(callback: (state: UpdateState) => void): () => void;
   sendChat(input: ChatRequest): Promise<ChatResult>;
   // --- Agent (Claude-Code-like autonomous loop) ---
   runAgent(input: AgentRunInput): Promise<void>;
   cancelAgent(): Promise<void>;
+  resetAgent(): Promise<void>;
   onAgentEvent(callback: (event: AgentStreamEvent) => void): () => void;
   // --- File explorer / editor ---
   explore(dirPath?: string): Promise<FsEntry[]>;

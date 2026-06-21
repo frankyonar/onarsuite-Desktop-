@@ -3,11 +3,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FileAction, PairingInput } from '../shared/types';
 import { DesktopRuntime } from './desktop-runtime';
+import { UpdateService } from './services/update-service';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROTOCOL = 'onarsuite-desktop';
 const runtime = new DesktopRuntime();
 let mainWindow: BrowserWindow | undefined;
+const updateService = new UpdateService(() => mainWindow);
 let heartbeatTimer: NodeJS.Timeout | undefined;
 
 function createWindow(): void {
@@ -64,6 +66,10 @@ function registerIpc(): void {
   ipcMain.handle('audit:list', () => runtime.audit.list());
   ipcMain.handle('sync:now', () => runtime.syncNow());
   ipcMain.handle('app:clear-local-data', () => runtime.clearLocalData());
+  ipcMain.handle('update:get-state', () => updateService.getState());
+  ipcMain.handle('update:check', () => updateService.checkForUpdates());
+  ipcMain.handle('update:download', () => updateService.downloadUpdate());
+  ipcMain.handle('update:install', () => updateService.installUpdate());
   ipcMain.handle('chat:send', (_event, input) => runtime.sendChat(input));
   ipcMain.handle('agent:run', (event, input) =>
     runtime.runAgent(input, (streamEvent) => event.sender.send('agent:event', streamEvent)));
@@ -132,6 +138,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     registerIpc();
     createWindow();
+    void updateService.checkForUpdates();
     try {
       await runtime.initialize();
     } catch (error) {
