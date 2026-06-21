@@ -1,8 +1,8 @@
 {
   "name": "@onarsuite/max-desktop",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
-  "description": "Max Desktop - agente locale sicuro per OnarSuite",
+  "description": "OnarSuite - agente desktop locale sicuro con Max AI",
   "main": "out/main/index.js",
   "type": "module",
   "scripts": {
@@ -39,22 +39,26 @@
     "vitest": "^3.1.4"
   },
   "build": {
-    "appId": "com.onarsuite.maxdesktop",
-    "productName": "Max Desktop",
+    "appId": "com.onarsuite.desktop",
+    "productName": "OnarSuite",
     "asar": true,
+    "icon": "build/icon.png",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "out/**/*",
       "package.json"
     ],
     "win": {
+      "icon": "build/icon.png",
       "target": [
         "nsis"
       ]
     },
     "mac": {
+      "icon": "build/icon.png",
       "target": [
         "dmg"
       ],

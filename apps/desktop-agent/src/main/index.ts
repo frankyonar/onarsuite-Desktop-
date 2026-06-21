@@ -16,7 +16,7 @@ function createWindow(): void {
     minHeight: 680,
     show: false,
     backgroundColor: '#f5f6f2',
-    title: 'Max Desktop',
+    title: 'OnarSuite',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -61,7 +61,7 @@ function registerIpc(): void {
 }
 
 app.whenReady().then(async () => {
-  app.setAppUserModelId('com.onarsuite.max-desktop');
+  app.setAppUserModelId('com.onarsuite.desktop');
   registerIpc();
   createWindow();
   try {

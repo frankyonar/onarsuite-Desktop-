@@ -360,5 +360,20 @@ h1, h2, h3, .brand strong { font-family: var(--font-display); font-weight: 600; 
 .code-editor { flex: 1; min-height: 420px; width: 100%; resize: none; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; outline: none; background: var(--glass-strong); color: var(--ink); font: 12.5px/1.6 var(--font-mono); white-space: pre; overflow: auto; }
 .code-editor:focus { border-color: var(--ring); box-shadow: 0 0 0 3px rgba(59,130,246,.18); }
 
+/* ---- Brand (OnarSuite molecule icon + wordmark) ---- */
+.brand-icon { display: block; border-radius: 22%; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(37,99,235,.22)); }
+.brand { align-items: center; }
+.wordmark { font-family: var(--font-display); font-size: 17px; font-weight: 400; letter-spacing: -0.02em; color: var(--ink); }
+.wordmark strong { font-size: 17px; font-weight: 700; }
+.chat-welcome .brand-icon, .splash .brand-icon { margin: 0 auto 22px; }
+.pairing-copy .brand-icon { margin-bottom: 40px; filter: drop-shadow(0 10px 26px rgba(8,20,60,.4)); }
+.orb .brand-icon { filter: drop-shadow(0 12px 26px rgba(8,20,60,.4)); }
+
+/* ---- Resizable sidebar handle ---- */
+.sidebar { position: sticky; }
+.sidebar-resizer { position: absolute; top: 0; right: -3px; width: 8px; height: 100%; cursor: col-resize; z-index: 6; }
+.sidebar-resizer::after { content: ''; position: absolute; top: 0; left: 3px; width: 2px; height: 100%; background: transparent; transition: background .15s; }
+.sidebar-resizer:hover::after, .sidebar-resizer:active::after { background: var(--brand); }
+
 @media (max-width: 1050px) { .hero-card { padding: 30px; } .orb { width: 130px; height: 130px; } .files-layout, .explorer { grid-template-columns: 1fr; } .file-detail { position: static; } .log-row { grid-template-columns: 120px 150px 90px 1fr; } }
 @media (max-width: 800px) { .app-shell { grid-template-columns: 72px 1fr; } .sidebar { padding-inline: 10px; } .brand > div:last-child, .sidebar nav button:not(.active) { font-size: 0; } .sidebar nav button { justify-content: center; } .sidebar nav button > span { font-size: 18px; } .sidebar-status small { display: none; } .main-content { padding: 24px 20px; } .stats-grid, .settings-grid, .prompt-grid { grid-template-columns: 1fr; } .pairing-page { grid-template-columns: 1fr; } .pairing-copy { display: none; } .chat-stream, .console-stream { padding-inline: 20px; } }

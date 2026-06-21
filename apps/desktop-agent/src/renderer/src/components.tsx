@@ -34,6 +34,18 @@ export function Card({ title, eyebrow, action, children, className = '' }: { tit
   );
 }
 
+const ONAR_ICON = new URL('./assets/onar-icon.png', import.meta.url).href;
+
+/** The OnarSuite molecule app icon, used wherever the brand mark appears. */
+export function BrandMark({ size = 40 }: { size?: number }) {
+  return <img className="brand-icon" src={ONAR_ICON} alt="OnarSuite" width={size} height={size} style={{ width: size, height: size }} />;
+}
+
+/** The "onarsuite" wordmark (onar bold + suite light), theme-aware via CSS. */
+export function Wordmark() {
+  return <span className="wordmark"><strong>onar</strong>suite</span>;
+}
+
 const connectionLabels: Record<ConnectionState, string> = {
   connected: 'Connesso', offline: 'Offline', not_paired: 'Non collegato', revoked: 'Revocato', error: 'Errore',
 };

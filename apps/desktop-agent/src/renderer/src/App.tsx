@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, FsEntry, LocalFile, PairingInput, ToolName } from '../../shared/types';
 import { BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
-import { Button, Card, EmptyState, Markdown, StatusPill, ToolCard } from './components';
+import { BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard, Wordmark } from './components';
 
 type View = 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
 type Theme = 'light' | 'dark';
@@ -43,6 +43,24 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'success' | 'error' | 'warning'; text: string }>();
   const [theme, toggleTheme] = useTheme();
+  const [sidebarWidth, setSidebarWidth] = useState(() => Number(localStorage.getItem('max-sidebar-w')) || 244);
+
+  useEffect(() => { localStorage.setItem('max-sidebar-w', String(sidebarWidth)); }, [sidebarWidth]);
+
+  const startResize = useCallback((event: ReactMouseEvent) => {
+    event.preventDefault();
+    const onMove = (e: globalThis.MouseEvent) => setSidebarWidth(Math.min(460, Math.max(184, e.clientX)));
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.removeProperty('cursor');
+      document.body.style.removeProperty('user-select');
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!window.maxDesktop) throw new Error('Il collegamento sicuro con Max Desktop non è disponibile. Riavvia l’app.');
@@ -74,15 +92,16 @@ export function App() {
   if (!snapshot) return <StartupScreen error={startupError} onRetry={() => void refresh().catch((error) => setStartupError(errorText(error)))} />;
   if (snapshot.connection === 'not_paired') return <PairingPage snapshot={snapshot} busy={busy} notice={notice} onPair={(input) => run(() => window.maxDesktop.pair(input))} />;
 
-  return <div className="app-shell">
+  return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)` }}>
     <aside className="sidebar">
-      <div className="brand"><div className="max-mark small">M</div><div><strong>Max Desktop</strong><span>per OnarSuite</span></div></div>
+      <div className="brand"><BrandMark size={34} /><div><Wordmark /><span>Agente Max AI</span></div></div>
       <nav>{navItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}</nav>
       <div className="sidebar-status"><StatusPill state={snapshot.connection} /><small>{snapshot.accountLabel || snapshot.deviceName}</small></div>
+      <div className="sidebar-resizer" onMouseDown={startResize} title="Trascina per regolare la larghezza" />
     </aside>
     <main className="main-content">
       <header className="topbar">
-        <div><span className="eyebrow">ONARSUITE / MAX DESKTOP</span><h1>{viewTitles[view]}</h1></div>
+        <div><span className="eyebrow">ONARSUITE · AGENTE MAX</span><h1>{viewTitles[view]}</h1></div>
         <div className="topbar-actions">
           {snapshot.pendingActions > 0 && <span className="queue-count">{snapshot.pendingActions} in coda</span>}
           <button className="theme-toggle" title="Tema chiaro/scuro" onClick={toggleTheme}>{theme === 'dark' ? '☀' : '☾'}</button>
@@ -101,14 +120,14 @@ export function App() {
 }
 
 function StartupScreen({ error, onRetry }: { error?: string; onRetry: () => void }) {
-  return <div className="splash"><div className="max-mark">M</div><h2>{error ? 'Max Desktop non è riuscito ad avviarsi' : 'Avvio di Max Desktop…'}</h2>{error && <><p className="startup-error">{error}</p><Button onClick={onRetry}>Riprova</Button></>}</div>;
+  return <div className="splash"><BrandMark size={72} /><h2>{error ? 'OnarSuite non è riuscito ad avviarsi' : 'Avvio di OnarSuite…'}</h2>{error && <><p className="startup-error">{error}</p><Button onClick={onRetry}>Riprova</Button></>}</div>;
 }
 
 function PairingPage({ snapshot, busy, notice, onPair }: { snapshot: AppSnapshot; busy: boolean; notice?: { tone: string; text: string }; onPair: (input: PairingInput) => void }) {
   const [serverUrl, setServerUrl] = useState(snapshot.serverUrl || 'https://onarsuite.com');
   const [deviceName, setDeviceName] = useState(snapshot.deviceName);
   const [pairingCode, setPairingCode] = useState('');
-  return <div className="pairing-page"><section className="pairing-copy"><div className="max-mark">M</div><span className="eyebrow">MAX DESKTOP PER ONARSUITE</span><h1>Il tuo dipendente digitale,<br />sul tuo computer.</h1><p>Max legge, scrive e modifica i file nelle cartelle che autorizzi, esegue comandi e crea cose in OnarSuite. In autonomia, con ogni azione registrata.</p><div className="trust-list"><span>✓ Accesso solo alle cartelle autorizzate</span><span>✓ Token cifrato dal sistema operativo</span><span>✓ Audit log completo di ogni azione</span></div></section><Card className="pairing-card" eyebrow="PRIMO ACCESSO" title="Collega questo computer">{notice && <div className={`notice notice-${notice.tone}`}>{notice.text}</div>}<form onSubmit={(event) => { event.preventDefault(); onPair({ serverUrl, deviceName, pairingCode: pairingCode || undefined }); }}><label>Server OnarSuite<input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} required /></label><label>Nome dispositivo<input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} required /></label><label>Codice pairing <span>(se richiesto)</span><input value={pairingCode} onChange={(event) => setPairingCode(event.target.value)} /></label><Button disabled={busy}>{busy ? 'Collegamento…' : 'Collega a OnarSuite'}</Button><small className="form-note">La connessione usa HTTPS e può essere revocata da OnarSuite.</small></form></Card></div>;
+  return <div className="pairing-page"><section className="pairing-copy"><BrandMark size={64} /><span className="eyebrow">ONARSUITE · AGENTE MAX</span><h1>Il tuo dipendente digitale,<br />sul tuo computer.</h1><p>Max legge, scrive e modifica i file nelle cartelle che autorizzi, esegue comandi e crea cose in OnarSuite. In autonomia, con ogni azione registrata.</p><div className="trust-list"><span>✓ Accesso solo alle cartelle autorizzate</span><span>✓ Token cifrato dal sistema operativo</span><span>✓ Audit log completo di ogni azione</span></div></section><Card className="pairing-card" eyebrow="PRIMO ACCESSO" title="Collega questo computer">{notice && <div className={`notice notice-${notice.tone}`}>{notice.text}</div>}<form onSubmit={(event) => { event.preventDefault(); onPair({ serverUrl, deviceName, pairingCode: pairingCode || undefined }); }}><label>Server OnarSuite<input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} required /></label><label>Nome dispositivo<input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} required /></label><label>Codice pairing <span>(se richiesto)</span><input value={pairingCode} onChange={(event) => setPairingCode(event.target.value)} /></label><Button disabled={busy}>{busy ? 'Collegamento…' : 'Collega a OnarSuite'}</Button><small className="form-note">La connessione usa HTTPS e può essere revocata da OnarSuite.</small></form></Card></div>;
 }
 
 const SUGGESTIONS = [
@@ -153,7 +172,7 @@ function AgentConsole({ files, selected, onSelectFile, onAfterRun }: { files: Lo
   return <div className="console">
     <div className="console-stream" ref={streamRef}>
       {items.length === 0 && !running ? <div className="chat-welcome">
-        <div className="max-mark">M</div>
+        <BrandMark size={64} />
         <span className="eyebrow">AGENTE AUTONOMO · MAX AI</span>
         <h2>Cosa faccio per te oggi?</h2>
         <p>Dammi un obiettivo. Leggo i file, eseguo comandi e creo cose in OnarSuite per portarlo a termine — da solo.</p>
@@ -173,8 +192,8 @@ function AgentConsole({ files, selected, onSelectFile, onAfterRun }: { files: Lo
         <span className="autonomous-pill" title="Max agisce senza chiedere conferma; ogni azione è nell’audit log">● Modalità autonoma</span>
       </div>
       <div className="composer-row">
-        <textarea value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(e); }} placeholder="Chiedi a Max di fare qualcosa…  (⌘/Ctrl+Invio per inviare)" rows={3} />
-        {running ? <Button variant="danger" type="button" onClick={stop}>Ferma</Button> : <Button disabled={!text.trim()}>Invia</Button>}
+        <textarea value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(e); } }} placeholder="Chiedi a Max di fare qualcosa…  (Invio per inviare · Shift+Invio per andare a capo)" rows={3} />
+        {running ? <Button variant="danger" type="button" onClick={stop}>Ferma</Button> : <Button type="submit" disabled={!text.trim()}>Invia ↑</Button>}
       </div>
       <small>Max opera solo nelle cartelle autorizzate. Comandi shell e modifiche ai file sono registrati nell’audit log.</small>
     </form>
@@ -257,7 +276,7 @@ function ExplorerView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'er
   </div>;
 }
 
-function Dashboard({ snapshot, files, logs, onGoAgent, onSync }: { snapshot: AppSnapshot; files: LocalFile[]; logs: AuditEntry[]; onGoAgent: () => void; onSync: () => void }) { return <div className="page-grid"><Card className="hero-card"><div className="hero-copy"><span className="eyebrow">DIPENDENTE DIGITALE</span><h2>{snapshot.connection === 'connected' ? 'Max è pronto a lavorare.' : 'Max è offline.'}</h2><p>Dai a Max un obiettivo: legge i file, esegue comandi e crea cose in OnarSuite, in autonomia e con audit completo.</p><div className="hero-actions"><Button onClick={onGoAgent}>Apri l’agente</Button><Button variant="secondary" onClick={onSync}>Controlla connessione</Button></div></div><div className="orb"><div className="max-mark">M</div><StatusPill state={snapshot.connection} /></div></Card><div className="stats-grid"><Stat label="Documenti visibili" value={String(files.length)} detail="Workspace e cartelle autorizzate" /><Stat label="Cartelle autorizzate" value={String(snapshot.authorizedFolders.length)} detail="Ambito operativo di Max" /><Stat label="Ultimo sync" value={snapshot.lastSyncAt ? formatDate(snapshot.lastSyncAt) : 'Mai'} detail={`Versione ${snapshot.appVersion}`} /></div><Card title="Attività recenti">{logs.length ? <div className="activity-list">{logs.slice(0, 6).map((log) => <div key={log.id}><span className={`log-dot ${log.level}`} /><div><strong>{log.message}</strong><small>{formatDate(log.createdAt)} · {log.eventType}</small></div></div>)}</div> : <EmptyState icon="◎" title="Nessuna attività">Le azioni di Max appariranno qui.</EmptyState>}</Card></div>; }
+function Dashboard({ snapshot, files, logs, onGoAgent, onSync }: { snapshot: AppSnapshot; files: LocalFile[]; logs: AuditEntry[]; onGoAgent: () => void; onSync: () => void }) { return <div className="page-grid"><Card className="hero-card"><div className="hero-copy"><span className="eyebrow">DIPENDENTE DIGITALE</span><h2>{snapshot.connection === 'connected' ? 'Max è pronto a lavorare.' : 'Max è offline.'}</h2><p>Dai a Max un obiettivo: legge i file, esegue comandi e crea cose in OnarSuite, in autonomia e con audit completo.</p><div className="hero-actions"><Button onClick={onGoAgent}>Apri l’agente</Button><Button variant="secondary" onClick={onSync}>Controlla connessione</Button></div></div><div className="orb"><BrandMark size={84} /><StatusPill state={snapshot.connection} /></div></Card><div className="stats-grid"><Stat label="Documenti visibili" value={String(files.length)} detail="Workspace e cartelle autorizzate" /><Stat label="Cartelle autorizzate" value={String(snapshot.authorizedFolders.length)} detail="Ambito operativo di Max" /><Stat label="Ultimo sync" value={snapshot.lastSyncAt ? formatDate(snapshot.lastSyncAt) : 'Mai'} detail={`Versione ${snapshot.appVersion}`} /></div><Card title="Attività recenti">{logs.length ? <div className="activity-list">{logs.slice(0, 6).map((log) => <div key={log.id}><span className={`log-dot ${log.level}`} /><div><strong>{log.message}</strong><small>{formatDate(log.createdAt)} · {log.eventType}</small></div></div>)}</div> : <EmptyState icon="◎" title="Nessuna attività">Le azioni di Max appariranno qui.</EmptyState>}</Card></div>; }
 function Stat({ label, value, detail }: { label: string; value: string; detail: string }) { return <Card><span className="stat-label">{label}</span><strong className="stat-value">{value}</strong><small>{detail}</small></Card>; }
 
 function FoldersView({ snapshot, busy, onAdd, onRemove, onDrop, onChoose }: { snapshot: AppSnapshot; busy: boolean; onAdd: () => void; onRemove: (folder: string) => void; onDrop: (event: DragEvent) => void; onChoose: () => void }) { return <div className="page-grid"><Card title="Ambito operativo di Max" action={<Button disabled={busy} onClick={onAdd}>Aggiungi cartella</Button>}><div className="permission-banner"><strong>Max lavora solo nelle cartelle qui sotto.</strong><span>Dentro l’allowlist può leggere, scrivere, modificare ed eseguire comandi. Fuori, è bloccato.</span></div><div className="drop-zone" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}><span>＋</span><div><strong>Trascina qui i documenti</strong><small>per copiarli nella OnarSuite Workspace</small></div><Button variant="secondary" onClick={onChoose}>Scegli file</Button></div><div className="folder-list"><div><span className="folder-icon">▰</span><div><strong>OnarSuite Workspace</strong><small>{snapshot.workspacePath}</small></div><span className="fixed-badge">Sempre attiva</span></div>{snapshot.authorizedFolders.map((folder) => <div key={folder}><span className="folder-icon">▰</span><div><strong>{folder.split(/[\\/]/).pop()}</strong><small>{folder}</small></div><Button variant="ghost" onClick={() => onRemove(folder)}>Rimuovi</Button></div>)}</div></Card><Card title="Permessi"><div className="scope-columns"><div><strong>Consentiti (in autonomia)</strong>{MVP_SCOPES.map((scope) => <span key={scope} className="scope allowed">✓ {scope}</span>)}</div><div><strong>Sempre bloccati</strong>{BLOCKED_SCOPES.map((scope) => <span key={scope} className="scope blocked">× {scope}</span>)}</div></div></Card></div>; }
