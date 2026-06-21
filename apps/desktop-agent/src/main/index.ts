@@ -63,6 +63,7 @@ function registerIpc(): void {
   ipcMain.handle('fs:read', (_event, filePath: string) => runtime.readFileText(filePath));
   ipcMain.handle('fs:write', (_event, filePath: string, text: string) => runtime.writeFileText(filePath, text));
   ipcMain.handle('app:open-external', (_event, url: string) => shell.openExternal(url));
+  ipcMain.handle('onar:action', (_event, actionType: string, data: Record<string, unknown>) => runtime.onarCall(actionType, data ?? {}));
 }
 
 /** Lock down and route the embedded OnarSuite <webview>. */

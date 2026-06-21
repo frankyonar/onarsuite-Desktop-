@@ -368,6 +368,21 @@ export class DesktopRuntime {
     await this.audit.write('file_edited', 'security', 'File modificato dall\'editor', { filename: path.basename(filePath) });
   }
 
+  /** Native OnarSuite call (list/create/…) used by the native module screens. */
+  async onarCall(actionType: string, data: Record<string, unknown>): Promise<{ success: boolean; message: string; data?: unknown }> {
+    const config = await this.config.read();
+    if (!config.deviceId) return { success: false, message: 'Collega prima OnarSuite Desktop a OnarSuite.' };
+    try {
+      const result = await this.sdk.onarExecute(actionType, data);
+      this.connection = 'connected';
+      return result;
+    } catch (error) {
+      if (error instanceof NetworkError) this.connection = 'offline';
+      if (error instanceof RevokedDeviceError) this.connection = 'revoked';
+      return { success: false, message: errorMessage(error) };
+    }
+  }
+
   private async assertAuthorized(filePath: string): Promise<void> {
     const canonical = await realpath(filePath);
     const config = await this.config.read();

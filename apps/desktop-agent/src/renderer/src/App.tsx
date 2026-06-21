@@ -1,4 +1,4 @@
-import { createElement, useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, FsEntry, LocalFile, PairingInput, ToolName } from '../../shared/types';
 import { BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import { BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard, Wordmark } from './components';
@@ -110,7 +110,7 @@ export function App() {
         </div>
       </header>
       {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
-      {view === 'onarsuite' && <WebAppView serverUrl={snapshot.serverUrl} />}
+      {view === 'onarsuite' && <OnarHome onNotice={setNotice} onOpenExternal={() => window.maxDesktop.openExternal(snapshot.serverUrl)} />}
       {view === 'agent' && <AgentConsole files={files} selected={selected} onSelectFile={setSelected} onAfterRun={() => void refresh()} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
       {view === 'dashboard' && <Dashboard snapshot={snapshot} files={files} logs={logs} onGoAgent={() => setView('agent')} onSync={() => run(() => window.maxDesktop.syncNow())} />}
@@ -225,40 +225,135 @@ function reduceEvent(prev: ConsoleItem[], event: AgentStreamEvent): ConsoleItem[
   }
 }
 
-function WebAppView({ serverUrl }: { serverUrl: string }) {
-  const ref = useRef<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [nav, setNav] = useState<{ back: boolean; fwd: boolean; url: string }>({ back: false, fwd: false, url: serverUrl });
+type Notice = { tone: 'success' | 'error' | 'warning'; text: string };
+type Field = { key: string; label: string; type?: 'text' | 'email' | 'date' | 'number' | 'textarea'; required?: boolean; placeholder?: string };
+type ModuleDef = {
+  id: string; label: string; icon: string; hint: string;
+  listAction?: string; listKey?: string;
+  columns: Array<{ key: string; label: string; kind?: 'amount' }>;
+  createAction?: string; createLabel?: string; fields?: Field[];
+  rowActions?: Array<{ label: string; action: string }>;
+};
 
-  useEffect(() => {
-    const wv = ref.current;
-    if (!wv) return;
-    const onStart = () => setLoading(true);
-    const sync = () => { try { setNav({ back: wv.canGoBack(), fwd: wv.canGoForward(), url: wv.getURL() }); } catch { /* not ready */ } setLoading(false); };
-    wv.addEventListener('did-start-loading', onStart);
-    wv.addEventListener('did-stop-loading', sync);
-    wv.addEventListener('did-navigate', sync);
-    wv.addEventListener('did-navigate-in-page', sync);
-    return () => {
-      wv.removeEventListener('did-start-loading', onStart);
-      wv.removeEventListener('did-stop-loading', sync);
-      wv.removeEventListener('did-navigate', sync);
-      wv.removeEventListener('did-navigate-in-page', sync);
-    };
-  }, []);
+const MODULES: ModuleDef[] = [
+  { id: 'reminders', label: 'Promemoria', icon: '◷', hint: 'Scadenze e attività',
+    listAction: 'list_reminders', listKey: 'reminders',
+    columns: [{ key: 'title', label: 'Titolo' }, { key: 'date', label: 'Scadenza' }, { key: 'priority', label: 'Priorità' }],
+    createAction: 'create_reminder', createLabel: 'Nuovo promemoria',
+    fields: [{ key: 'title', label: 'Titolo', required: true }, { key: 'date', label: 'Scadenza', type: 'date' }, { key: 'priority', label: 'Priorità', placeholder: 'low · medium · high' }, { key: 'description', label: 'Note', type: 'textarea' }],
+    rowActions: [{ label: '✓ Completa', action: 'complete_reminder' }] },
+  { id: 'leads', label: 'Clienti', icon: '◉', hint: 'CRM e contatti',
+    listAction: 'list_leads', listKey: 'leads',
+    columns: [{ key: 'name', label: 'Nome' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Telefono' }],
+    createAction: 'create_customer', createLabel: 'Nuovo cliente',
+    fields: [{ key: 'name', label: 'Nome', required: true }, { key: 'email', label: 'Email', type: 'email' }, { key: 'phone', label: 'Telefono' }, { key: 'notes', label: 'Note', type: 'textarea' }] },
+  { id: 'contracts', label: 'Contratti', icon: '▤', hint: 'Contratti e bozze',
+    listAction: 'contract_list', listKey: 'contracts',
+    columns: [{ key: 'title', label: 'Titolo' }, { key: 'client', label: 'Cliente' }, { key: 'status', label: 'Stato' }, { key: 'amount', label: 'Importo', kind: 'amount' }],
+    createAction: 'create_contract', createLabel: 'Nuovo contratto',
+    fields: [{ key: 'title', label: 'Titolo', required: true }, { key: 'description', label: 'Descrizione', type: 'textarea' }, { key: 'amount', label: 'Importo (EUR)', type: 'number' }] },
+  { id: 'users', label: 'Utenti', icon: '◍', hint: 'Team e accessi',
+    listAction: 'list_users', listKey: 'users',
+    columns: [{ key: 'name', label: 'Nome' }, { key: 'email', label: 'Email' }, { key: 'type', label: 'Ruolo' }],
+    createAction: 'create_user', createLabel: 'Nuovo utente',
+    fields: [{ key: 'name', label: 'Nome', required: true }, { key: 'email', label: 'Email', type: 'email', required: true }, { key: 'role_id', label: 'ID ruolo', type: 'number', placeholder: 'es. 126 = Cliente' }, { key: 'mobile_no', label: 'Telefono' }] },
+];
 
-  const wv = () => ref.current;
-  return <div className="webapp">
-    <div className="webapp-bar">
-      <button onClick={() => wv()?.goBack()} disabled={!nav.back} title="Indietro">‹</button>
-      <button onClick={() => wv()?.goForward()} disabled={!nav.fwd} title="Avanti">›</button>
-      <button onClick={() => wv()?.reload()} title="Ricarica">⟳</button>
-      <button onClick={() => wv()?.loadURL(serverUrl)} title="Home OnarSuite">⌂</button>
-      <span className="webapp-url">{loading ? 'Caricamento…' : nav.url}</span>
-      <button onClick={() => void window.maxDesktop.openExternal(nav.url)} title="Apri nel browser">↗</button>
+const COMING: Array<{ label: string; icon: string; hint: string }> = [
+  { label: 'Calendario', icon: '▥', hint: 'Eventi e appuntamenti' },
+  { label: 'Prodotti', icon: '▦', hint: 'Catalogo e magazzino' },
+  { label: 'Preventivi', icon: '▣', hint: 'Offerte commerciali' },
+  { label: 'Fatture', icon: '€', hint: 'Fatturazione' },
+  { label: 'Email', icon: '✉', hint: 'Posta Max AI' },
+  { label: 'Ticket', icon: '◫', hint: 'Assistenza' },
+];
+
+function OnarHome({ onNotice, onOpenExternal }: { onNotice: (n: Notice) => void; onOpenExternal: () => void }) {
+  const [moduleId, setModuleId] = useState<string>();
+  const def = MODULES.find((m) => m.id === moduleId);
+  if (def) return <ModuleScreen def={def} onBack={() => setModuleId(undefined)} onNotice={onNotice} />;
+  return <div className="onar-home">
+    <Card className="onar-banner"><div><span className="eyebrow">GESTIONALE NATIVO</span><h2>Gestisci OnarSuite dall’app</h2><p>Moduli nativi collegati al tuo OnarSuite. Apri un modulo per vedere i dati reali e crearne di nuovi.</p></div><Button variant="secondary" onClick={onOpenExternal}>Apri OnarSuite web ↗</Button></Card>
+    <div className="module-grid">
+      {MODULES.map((m) => <button key={m.id} className="module-card" onClick={() => setModuleId(m.id)}><span className="module-icon">{m.icon}</span><strong>{m.label}</strong><small>{m.hint}</small></button>)}
+      {COMING.map((m) => <div key={m.label} className="module-card disabled"><span className="module-icon">{m.icon}</span><strong>{m.label}</strong><small>{m.hint}</small><span className="soon">in arrivo</span></div>)}
     </div>
-    {createElement('webview', { ref, className: 'webapp-frame', src: serverUrl, partition: 'persist:onarsuite', allowpopups: 'true' } as Record<string, unknown>)}
   </div>;
+}
+
+function ModuleScreen({ def, onBack, onNotice }: { def: ModuleDef; onBack: () => void; onNotice: (n: Notice) => void }) {
+  const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!def.listAction) { setLoading(false); return; }
+    setLoading(true);
+    const res = await window.maxDesktop.onar(def.listAction, {});
+    if (res.success) {
+      const payload = res.data as Record<string, unknown> | undefined;
+      setRows((payload?.[def.listKey ?? ''] as Array<Record<string, unknown>>) ?? []);
+    } else { onNotice({ tone: 'error', text: res.message }); setRows([]); }
+    setLoading(false);
+  }, [def, onNotice]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!def.createAction) return;
+    setBusy(true);
+    const payload: Record<string, unknown> = {};
+    for (const f of def.fields ?? []) {
+      const v = (form[f.key] ?? '').trim();
+      if (v) payload[f.key] = f.type === 'number' ? Number(v) : v;
+    }
+    const res = await window.maxDesktop.onar(def.createAction, payload);
+    setBusy(false);
+    if (res.success) { onNotice({ tone: 'success', text: res.message }); setShowForm(false); setForm({}); void load(); }
+    else onNotice({ tone: 'error', text: res.message });
+  };
+
+  const runRowAction = async (action: string, row: Record<string, unknown>) => {
+    setBusy(true);
+    const res = await window.maxDesktop.onar(action, { id: row.id });
+    setBusy(false);
+    onNotice({ tone: res.success ? 'success' : 'error', text: res.message });
+    if (res.success) void load();
+  };
+
+  const gridCols = { gridTemplateColumns: [...def.columns.map(() => 'minmax(0, 1fr)'), ...(def.rowActions ? ['150px'] : [])].join(' ') };
+
+  return <Card className="module-screen" eyebrow={def.hint} title={def.label}
+    action={<div className="module-actions"><Button variant="ghost" onClick={onBack}>← Moduli</Button>{def.createAction && <Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Annulla' : (def.createLabel ?? 'Nuovo')}</Button>}</div>}>
+    {showForm && def.fields && <form className="module-form" onSubmit={submit}>
+      {def.fields.map((f) => <label key={f.key}>{f.label}{f.required && ' *'}
+        {f.type === 'textarea'
+          ? <textarea value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} rows={3} placeholder={f.placeholder} />
+          : <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : 'text'} value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} required={f.required} placeholder={f.placeholder} />}
+      </label>)}
+      <Button disabled={busy}>{busy ? 'Salvataggio…' : 'Salva su OnarSuite'}</Button>
+    </form>}
+    {!showForm && (loading
+      ? <p className="muted-line">Carico i dati da OnarSuite…</p>
+      : rows.length === 0
+        ? <EmptyState icon={def.icon} title="Nessun dato">{def.createAction ? 'Crea il primo elemento con il pulsante in alto.' : 'Niente da mostrare.'}</EmptyState>
+        : <div className="data-table">
+            <div className="data-row head" style={gridCols}>{def.columns.map((c) => <span key={c.key}>{c.label}</span>)}{def.rowActions && <span />}</div>
+            {rows.map((row, i) => <div className="data-row" key={String(row.id ?? i)} style={gridCols}>
+              {def.columns.map((c) => <span key={c.key} title={fmtCell(row[c.key], c.kind, row)}>{fmtCell(row[c.key], c.kind, row)}</span>)}
+              {def.rowActions && <span className="row-actions">{def.rowActions.map((a) => <button key={a.action} disabled={busy} onClick={() => void runRowAction(a.action, row)}>{a.label}</button>)}</span>}
+            </div>)}
+          </div>)}
+  </Card>;
+}
+
+function fmtCell(value: unknown, kind: string | undefined, row: Record<string, unknown>): string {
+  if (value === null || value === undefined || value === '') return '—';
+  if (kind === 'amount') { const cur = (row.currency as string) || 'EUR'; return `${Number(value).toLocaleString('it-IT')} ${cur}`; }
+  return String(value);
 }
 
 function ExplorerView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void }) {

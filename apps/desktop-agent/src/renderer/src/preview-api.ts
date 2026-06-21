@@ -1,7 +1,7 @@
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, FsEntry, LocalFile, MaxDesktopApi } from '../../shared/types';
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.7.0', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.8.0', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -92,5 +92,12 @@ export function createPreviewApi(): MaxDesktopApi {
     readFileText: async (filePath) => ({ path: filePath, text: fileText[filePath] ?? '// File non disponibile in anteprima.', truncated: false }),
     writeFileText: async () => undefined,
     openExternal: async () => undefined,
+    onar: async (actionType) => {
+      if (actionType === 'list_reminders') return { success: true, message: '2 promemoria', data: { reminders: [{ id: 1, title: 'Richiamare Rossi', date: '2026-06-25', priority: 'high' }, { id: 2, title: 'Inviare preventivo', date: '2026-06-28', priority: 'medium' }] } };
+      if (actionType === 'list_leads') return { success: true, message: '1 cliente', data: { leads: [{ id: 1, name: 'Ferdinando Franzese', email: 'fra@example.com', phone: '333 1234567' }] } };
+      if (actionType === 'contract_list') return { success: true, message: '1 contratto', data: { contracts: [{ id: 1, title: 'Pacchetto turistico', client: 'Franzese', status: 'draft', amount: 1200, currency: 'EUR' }] } };
+      if (actionType === 'list_users') return { success: true, message: '1 utente', data: { users: [{ id: 1, name: 'Azienda Demo', email: 'company@example.com', type: 'company' }] } };
+      return { success: true, message: 'Anteprima: azione eseguita su OnarSuite.' };
+    },
   };
 }
