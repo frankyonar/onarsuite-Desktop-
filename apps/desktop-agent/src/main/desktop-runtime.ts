@@ -414,6 +414,27 @@ export class DesktopRuntime {
     return list;
   }
 
+  /** Ask the model for a short title summarising the conversation. */
+  async titleConversation(id: string): Promise<ConversationMeta[]> {
+    try {
+      const transcript = (await this.conversations.getMessages(id))
+        .filter((m) => m.role !== 'tool' && typeof m.content === 'string')
+        .map((m) => `${m.role}: ${String(m.content)}`)
+        .join('\n')
+        .slice(0, 2000);
+      if (transcript.trim()) {
+        const { message } = await this.sdk.agentStep(
+          'Sei un generatore di titoli. Rispondi SOLO con un titolo breve, senza virgolette né punteggiatura finale.',
+          [{ role: 'user', content: `Titolo brevissimo (3-5 parole, in italiano) per questa conversazione:\n\n${transcript}` }],
+          [],
+        );
+        const title = String(message.content ?? '').replace(/["'\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+        if (title) return this.conversations.rename(id, title);
+      }
+    } catch { /* keep the derived title on any error */ }
+    return this.conversations.list();
+  }
+
   /** Explorer: list a directory, or the authorized roots when no path is given. */
   async explore(dirPath?: string): Promise<FsEntry[]> {
     const config = await this.config.read();

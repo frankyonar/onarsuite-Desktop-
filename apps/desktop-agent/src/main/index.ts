@@ -83,6 +83,7 @@ function registerIpc(): void {
   ipcMain.handle('conv:select', (_event, id: string) => runtime.selectConversation(id));
   ipcMain.handle('conv:delete', (_event, id: string) => runtime.deleteConversation(id));
   ipcMain.handle('conv:rename', (_event, id: string, title: string) => runtime.renameConversation(id, title));
+  ipcMain.handle('conv:title', (_event, id: string) => runtime.titleConversation(id));
   ipcMain.handle('fs:explore', (_event, dirPath?: string) => runtime.explore(dirPath));
   ipcMain.handle('fs:read', (_event, filePath: string) => runtime.readFileText(filePath));
   ipcMain.handle('fs:write', (_event, filePath: string, text: string) => runtime.writeFileText(filePath, text));

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
+﻿import { createElement, useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import { AppLogo, BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard } from './components';
@@ -79,6 +79,28 @@ export function App() {
     setConversations(await window.maxDesktop.deleteConversation(id));
     if (activeConv?.id === id) await newChat();
   }, [activeConv, newChat]);
+
+  const titleConversation = useCallback(async (id: string) => {
+    setConversations(await window.maxDesktop.titleConversation(id).catch(() => []));
+  }, []);
+
+  const [lockMode, setLockMode] = useState<'closed' | 'preview' | 'web'>('closed');
+  const [lockPanel, setLockPanel] = useState<PanelData>();
+  const [lockWidth, setLockWidth] = useState(() => Number(localStorage.getItem('max-lock-w')) || 400);
+
+  useEffect(() => { localStorage.setItem('max-lock-w', String(lockWidth)); }, [lockWidth]);
+
+  const showPanel = useCallback((p: PanelData) => { setLockPanel(p); setLockMode('preview'); }, []);
+
+  const startLockResize = useCallback((event: ReactMouseEvent) => {
+    event.preventDefault();
+    const onMove = (e: globalThis.MouseEvent) => setLockWidth(Math.min(900, Math.max(320, window.innerWidth - e.clientX)));
+    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); document.body.style.removeProperty('cursor'); document.body.style.removeProperty('user-select'); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
   const [files, setFiles] = useState<LocalFile[]>([]);
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [attachments, setAttachments] = useState<LocalFile[]>([]);
@@ -174,7 +196,7 @@ export function App() {
   if (!snapshot) return <StartupScreen error={startupError} onRetry={() => void refresh().catch((error) => setStartupError(errorText(error)))} />;
   if (snapshot.connection === 'not_paired') return <PairingPage snapshot={snapshot} busy={busy} notice={notice} onPair={(input) => run(() => window.maxDesktop.pair(input))} />;
 
-  return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)` }}>
+  return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)${lockMode !== 'closed' ? ` ${lockWidth}px` : ''}` }}>
     <aside className="sidebar">
       <div className="brand"><AppLogo theme={theme} planName={snapshot.planName} /></div>
       <button className="new-chat" onClick={() => void newChat()}><span>+</span>Nuova chat</button>
@@ -212,6 +234,7 @@ export function App() {
         <div><span className="eyebrow">ONARSUITE · AGENTE MAX</span><h1>{viewTitles[view]}</h1></div>
         <div className="topbar-actions">
           {snapshot.pendingActions > 0 && <span className="queue-count">{snapshot.pendingActions} in coda</span>}
+          <Button variant="secondary" onClick={() => setLockMode((m) => m === 'web' ? 'closed' : 'web')}>OnarSuite web</Button>
           <button className="theme-toggle" title="Tema chiaro/scuro" onClick={toggleTheme}>{theme === 'dark' ? '☀' : '☾'}</button>
           <Button variant="secondary" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}>Sincronizza</Button>
         </div>
@@ -220,13 +243,14 @@ export function App() {
       {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
       {view === 'onarsuite' && <OnarHome onNotice={setNotice} onGoClients={() => setView('clients')} />}
       {view === 'clients' && <ClientsView />}
-      {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} onPersist={(items) => void persistConversation(activeConv.id, items)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
+      {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} onPersist={(items) => void persistConversation(activeConv.id, items)} onPanel={showPanel} onTitle={(id) => void titleConversation(id)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
       {view === 'dashboard' && <Dashboard snapshot={snapshot} files={files} logs={logs} onGoAgent={() => setView('agent')} onSync={() => run(() => window.maxDesktop.syncNow())} />}
       {view === 'folders' && <FoldersView snapshot={snapshot} busy={busy} onAdd={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemove={(folder) => run(() => window.maxDesktop.removeAuthorizedFolder(folder))} onDrop={importDrop} onChoose={() => run(() => window.maxDesktop.chooseFiles(), 'File aggiunti alla workspace.')} />}
       {view === 'logs' && <LogsView logs={logs} />}
       {view === 'settings' && <SettingsView snapshot={snapshot} busy={busy} onDisconnect={() => run(() => window.maxDesktop.disconnect())} onClear={() => run(() => window.maxDesktop.clearLocalData())} />}
     </main>
+    {lockMode !== 'closed' && <Lock mode={lockMode === 'web' ? 'web' : 'preview'} panel={lockPanel} serverUrl={snapshot.serverUrl} onMode={setLockMode} onClose={() => setLockMode('closed')} onResize={startLockResize} onNotice={setNotice} />}
   </div>;
 }
 
@@ -272,30 +296,34 @@ const SUGGESTIONS = [
   'Mostrami le attività di oggi',
 ];
 
-function AgentConsole({ convId, initialItems, onPersist, attachments, onAttachmentsChange, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; attachments: LocalFile[]; onAttachmentsChange: (files: LocalFile[]) => void; onAfterRun: () => void; accountLabel?: string }) {
+function AgentConsole({ convId, initialItems, onPersist, onPanel, onTitle, attachments, onAttachmentsChange, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; onPanel: (panel: PanelData) => void; onTitle: (id: string) => void; attachments: LocalFile[]; onAttachmentsChange: (files: LocalFile[]) => void; onAfterRun: () => void; accountLabel?: string }) {
   const [items, setItems] = useState<ConsoleItem[]>(initialItems);
   const [status, setStatus] = useState<string>();
   const [running, setRunning] = useState(false);
   const [text, setText] = useState('');
-  const [panel, setPanel] = useState<PanelData>();
   const [dragActive, setDragActive] = useState(false);
   const streamRef = useRef<HTMLDivElement>(null);
+  const titledRef = useRef(initialItems.length > 0);
 
   useEffect(() => {
     const unsubscribe = window.maxDesktop.onAgentEvent((event: AgentStreamEvent) => {
       setItems((prev) => reduceEvent(prev, event));
       if (event.type === 'status') setStatus(event.text);
-      if (event.type === 'panel') setPanel(event.panel);
+      if (event.type === 'panel') onPanel(event.panel);
       if (event.type === 'done' || event.type === 'error') { setRunning(false); setStatus(undefined); }
     });
     return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: 'smooth' }); }, [items, status]);
 
   // Persist the transcript once a turn settles (history survives restarts).
   useEffect(() => {
-    if (items.length > 0 && !running) onPersist(items);
+    if (items.length > 0 && !running) {
+      onPersist(items);
+      if (!titledRef.current && items.some((i) => i.kind === 'assistant')) { titledRef.current = true; onTitle(convId); }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, running, convId]);
 
@@ -370,8 +398,7 @@ function AgentConsole({ convId, initialItems, onPersist, attachments, onAttachme
     </div>
   </form>;
 
-  return <div className="agent-layout">
-    <div className={`console ${empty ? 'is-empty' : ''}`}>
+  return <div className={`console ${empty ? 'is-empty' : ''}`}>
     {empty
       ? <div className="console-hero">
           <BrandMark size={46} />
@@ -388,34 +415,83 @@ function AgentConsole({ convId, initialItems, onPersist, attachments, onAttachme
           </div>
           {composer}
         </>}
-    </div>
-    {panel && <SidePanel panel={panel} onClose={() => setPanel(undefined)} />}
   </div>;
 }
 
-function SidePanel({ panel, onClose }: { panel: PanelData; onClose: () => void }) {
-  return <aside className="side-panel">
-    <header className="side-panel-head">
-      <span className="side-panel-kind">{PANEL_LABELS[panel.kind]}</span>
-      <button onClick={onClose} title="Chiudi">×</button>
-    </header>
-    <div className="side-panel-body">
-      <div className="side-panel-title">
-        <strong>{panel.title}</strong>
-        {panel.ok !== undefined && <span className={`pill ${panel.ok ? 'ok' : 'err'}`}>{panel.ok ? '✓' : '✗'}</span>}
+type LockMode = 'preview' | 'web';
+
+/** The right column ("lock"): structured preview / file editor, or the logged-in
+ *  OnarSuite web app for actions only available on the web. Resizable. */
+function Lock({ mode, panel, serverUrl, onMode, onClose, onResize, onNotice }: { mode: LockMode; panel?: PanelData; serverUrl: string; onMode: (mode: LockMode) => void; onClose: () => void; onResize: (event: ReactMouseEvent) => void; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void }) {
+  return <aside className="lock">
+    <div className="lock-resizer" onMouseDown={onResize} title="Trascina per ridimensionare" />
+    <header className="lock-head">
+      <div className="lock-tabs">
+        <button className={mode === 'preview' ? 'active' : ''} disabled={!panel} onClick={() => onMode('preview')}>Anteprima</button>
+        <button className={mode === 'web' ? 'active' : ''} onClick={() => onMode('web')}>OnarSuite web</button>
       </div>
-      {panel.subtitle && <p className="side-panel-sub">{panel.subtitle}</p>}
-      {panel.fields && panel.fields.length > 0 && <dl className="side-panel-fields">{panel.fields.map((f) => <div key={f.label}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>}
-      {panel.columns && panel.rows && <div className="side-panel-table"><div className="data-row head" style={{ gridTemplateColumns: panel.columns.map(() => 'minmax(0,1fr)').join(' ') }}>{panel.columns.map((c) => <span key={c}>{c}</span>)}</div>{panel.rows.map((row, i) => <div className="data-row" key={i} style={{ gridTemplateColumns: panel.columns!.map(() => 'minmax(0,1fr)').join(' ') }}>{row.map((cell, j) => <span key={j} title={cell}>{cell}</span>)}</div>)}</div>}
-      {panel.kind === 'file' && panel.path && <div className="side-panel-actions">
-        <button onClick={() => void window.maxDesktop.openFile(panel.path!)}>Apri</button>
-        <button onClick={() => void window.maxDesktop.revealFile(panel.path!)}>Mostra cartella</button>
-      </div>}
-      {panel.text && (panel.kind === 'file'
-        ? <Markdown content={`\`\`\`${panel.lang ?? ''}\n${panel.text}\n\`\`\``} />
-        : <p className="side-panel-text">{panel.text}</p>)}
+      <button className="lock-close" onClick={onClose} title="Chiudi">×</button>
+    </header>
+    <div className="lock-body">
+      {mode === 'web'
+        ? <LockWeb serverUrl={serverUrl} />
+        : panel ? <LockPreview panel={panel} onNotice={onNotice} /> : <div className="lock-empty">Nessuna anteprima. Chiedi a Max di leggere o creare qualcosa.</div>}
     </div>
   </aside>;
+}
+
+function LockPreview({ panel, onNotice }: { panel: PanelData; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(panel.text ?? '');
+  useEffect(() => { setText(panel.text ?? ''); setEditing(false); }, [panel]);
+
+  const save = async () => {
+    if (!panel.path) return;
+    try { await window.maxDesktop.writeFileText(panel.path, text); onNotice({ tone: 'success', text: 'File salvato.' }); setEditing(false); }
+    catch (error) { onNotice({ tone: 'error', text: errorText(error) }); }
+  };
+
+  return <div className="lock-preview">
+    <span className="side-panel-kind">{PANEL_LABELS[panel.kind]}</span>
+    <div className="side-panel-title"><strong>{panel.title}</strong>{panel.ok !== undefined && <span className={`pill ${panel.ok ? 'ok' : 'err'}`}>{panel.ok ? '✓' : '✗'}</span>}</div>
+    {panel.subtitle && <p className="side-panel-sub">{panel.subtitle}</p>}
+    {panel.fields && panel.fields.length > 0 && <dl className="side-panel-fields">{panel.fields.map((f) => <div key={f.label}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>}
+    {panel.columns && panel.rows && <div className="side-panel-table"><div className="data-row head" style={{ gridTemplateColumns: panel.columns.map(() => 'minmax(0,1fr)').join(' ') }}>{panel.columns.map((c) => <span key={c}>{c}</span>)}</div>{panel.rows.map((row, i) => <div className="data-row" key={i} style={{ gridTemplateColumns: panel.columns!.map(() => 'minmax(0,1fr)').join(' ') }}>{row.map((cell, j) => <span key={j} title={cell}>{cell}</span>)}</div>)}</div>}
+    {panel.kind === 'file' && panel.path && <div className="side-panel-actions">
+      <button onClick={() => void window.maxDesktop.openFile(panel.path!)}>Apri</button>
+      <button onClick={() => void window.maxDesktop.revealFile(panel.path!)}>Mostra cartella</button>
+      <button onClick={() => editing ? void save() : setEditing(true)}>{editing ? 'Salva' : 'Modifica'}</button>
+      {editing && <button onClick={() => { setText(panel.text ?? ''); setEditing(false); }}>Annulla</button>}
+    </div>}
+    {panel.kind === 'file'
+      ? (editing
+          ? <textarea className="lock-editor" value={text} spellCheck={false} onChange={(e) => setText(e.target.value)} />
+          : (panel.text ? <Markdown content={`\`\`\`${panel.lang ?? ''}\n${text}\n\`\`\``} /> : null))
+      : (panel.text ? <p className="side-panel-text">{panel.text}</p> : null)}
+  </div>;
+}
+
+function LockWeb({ serverUrl }: { serverUrl: string }) {
+  const ref = useRef<{ goBack(): void; goForward(): void; reload(): void; loadURL(u: string): void; getURL(): string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const wv = ref.current as unknown as { addEventListener: (e: string, cb: () => void) => void; removeEventListener: (e: string, cb: () => void) => void } | null;
+    if (!wv) return;
+    const on = () => setLoading(true); const off = () => setLoading(false);
+    wv.addEventListener('did-start-loading', on); wv.addEventListener('did-stop-loading', off);
+    return () => { wv.removeEventListener('did-start-loading', on); wv.removeEventListener('did-stop-loading', off); };
+  }, []);
+  return <div className="lock-web">
+    <div className="lock-web-bar">
+      <button onClick={() => ref.current?.goBack()} title="Indietro">‹</button>
+      <button onClick={() => ref.current?.goForward()} title="Avanti">›</button>
+      <button onClick={() => ref.current?.reload()} title="Ricarica">⟳</button>
+      <button onClick={() => ref.current?.loadURL(serverUrl)} title="Home">⌂</button>
+      <span className="lock-web-status">{loading ? 'Caricamento…' : 'OnarSuite'}</span>
+      <button onClick={() => { const u = ref.current?.getURL(); if (u) void window.maxDesktop.openExternal(u); }} title="Apri nel browser">↗</button>
+    </div>
+    {createElement('webview', { ref, className: 'lock-web-frame', src: serverUrl, partition: 'persist:onarsuite-web', allowpopups: 'true' } as Record<string, unknown>)}
+  </div>;
 }
 
 const PANEL_LABELS: Record<PanelData['kind'], string> = { customer: 'Cliente', contract: 'Contratto', file: 'File', table: 'Tabella', result: 'Risultato' };
