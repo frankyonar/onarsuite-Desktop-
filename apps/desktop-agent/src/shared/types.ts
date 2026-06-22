@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.11';
+export const APP_VERSION = '0.9.12';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -237,6 +237,7 @@ export interface MaxDesktopApi {
   newConversation(): Promise<Conversation>;
   selectConversation(id: string): Promise<void>;
   deleteConversation(id: string): Promise<ConversationMeta[]>;
+  renameConversation(id: string, title: string): Promise<ConversationMeta[]>;
   onAgentEvent(callback: (event: AgentStreamEvent) => void): () => void;
   // --- File explorer / editor ---
   explore(dirPath?: string): Promise<FsEntry[]>;

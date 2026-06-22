@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.11', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.12', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', planName: 'PRO', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -110,6 +110,7 @@ export function createPreviewApi(): MaxDesktopApi {
     newConversation: async () => ({ id: crypto.randomUUID(), title: 'Nuova chat', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), items: [] }),
     selectConversation: async () => undefined,
     deleteConversation: async (id) => { convs = convs.filter((c) => c.id !== id); return convs.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt })); },
+    renameConversation: async (id, title) => { const c = convs.find((x) => x.id === id); if (c) c.title = title; return convs.map((x) => ({ id: x.id, title: x.title, updatedAt: x.updatedAt })); },
     onAgentEvent: (callback) => { listeners.add(callback); return () => listeners.delete(callback); },
     explore: async (dirPath) => tree[dirPath ?? ''] ?? [],
     readFileText: async (filePath) => ({ path: filePath, text: fileText[filePath] ?? '// File non disponibile in anteprima.', truncated: false }),

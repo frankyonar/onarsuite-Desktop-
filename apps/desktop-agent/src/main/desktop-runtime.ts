@@ -399,6 +399,10 @@ export class DesktopRuntime {
     return this.conversations.save(input.id, title, input.items, this.engine.getMessages());
   }
 
+  renameConversation(id: string, title: string): Promise<ConversationMeta[]> {
+    return this.conversations.rename(id, title.trim().slice(0, 80) || 'Chat');
+  }
+
   async deleteConversation(id: string): Promise<ConversationMeta[]> {
     const list = await this.conversations.remove(id);
     if (this.activeConvId === id) { this.activeConvId = undefined; this.engine.reset(); }

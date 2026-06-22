@@ -37,6 +37,7 @@ const api: MaxDesktopApi = {
   newConversation: () => ipcRenderer.invoke('conv:new'),
   selectConversation: (id: string) => ipcRenderer.invoke('conv:select', id),
   deleteConversation: (id: string) => ipcRenderer.invoke('conv:delete', id),
+  renameConversation: (id: string, title: string) => ipcRenderer.invoke('conv:rename', id, title),
   onAgentEvent: (callback: (event: AgentStreamEvent) => void) => {
     const listener = (_event: unknown, payload: AgentStreamEvent): void => callback(payload);
     ipcRenderer.on('agent:event', listener);

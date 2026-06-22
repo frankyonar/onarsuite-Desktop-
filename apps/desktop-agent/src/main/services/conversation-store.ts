@@ -65,6 +65,13 @@ export class ConversationStore {
     return this.list();
   }
 
+  async rename(id: string, title: string): Promise<ConversationMeta[]> {
+    const all = await this.readAll();
+    const c = all.find((x) => x.id === id);
+    if (c) { c.title = title; c.updatedAt = new Date().toISOString(); await this.writeAll(all); }
+    return this.list();
+  }
+
   async remove(id: string): Promise<ConversationMeta[]> {
     await this.writeAll((await this.readAll()).filter((x) => x.id !== id));
     return this.list();

@@ -40,6 +40,16 @@ export function App() {
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [activeConv, setActiveConv] = useState<{ id: string; items: ConsoleItem[] }>();
   const [convSearch, setConvSearch] = useState('');
+  const [renamingId, setRenamingId] = useState<string>();
+  const [renameText, setRenameText] = useState('');
+
+  const startRename = useCallback((id: string, title: string) => { setRenamingId(id); setRenameText(title); }, []);
+  const commitRename = useCallback(async () => {
+    const id = renamingId;
+    const title = renameText.trim();
+    setRenamingId(undefined);
+    if (id && title) setConversations(await window.maxDesktop.renameConversation(id, title));
+  }, [renamingId, renameText]);
 
   const loadConversations = useCallback(async () => {
     setConversations(await window.maxDesktop.listConversations().catch(() => []));
@@ -173,9 +183,14 @@ export function App() {
         <div className="conv-search"><input value={convSearch} onChange={(e) => setConvSearch(e.target.value)} placeholder="Cerca chat..." /></div>
         <div className="conv-list">
           {conversations.filter((c) => c.title.toLowerCase().includes(convSearch.toLowerCase())).map((c) => (
-            <div key={c.id} className={`conv-item ${activeConv?.id === c.id ? 'active' : ''}`} onClick={() => void openConversation(c.id)}>
-              <span className="conv-title">{c.title}</span>
-              <button className="conv-del" title="Elimina" onClick={(e) => { e.stopPropagation(); void removeConversation(c.id); }}>×</button>
+            <div key={c.id} className={`conv-item ${activeConv?.id === c.id ? 'active' : ''}`} onClick={() => { if (renamingId !== c.id) void openConversation(c.id); }} onDoubleClick={() => startRename(c.id, c.title)}>
+              {renamingId === c.id
+                ? <input className="conv-rename" autoFocus value={renameText} onClick={(e) => e.stopPropagation()} onChange={(e) => setRenameText(e.target.value)} onBlur={() => void commitRename()} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void commitRename(); } if (e.key === 'Escape') setRenamingId(undefined); }} />
+                : <>
+                    <span className="conv-title">{c.title}</span>
+                    <button className="conv-act" title="Rinomina" onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}>✎</button>
+                    <button className="conv-del" title="Elimina" onClick={(e) => { e.stopPropagation(); void removeConversation(c.id); }}>×</button>
+                  </>}
             </div>
           ))}
           {conversations.length === 0 && <p className="conv-empty">Le tue chat appariranno qui.</p>}

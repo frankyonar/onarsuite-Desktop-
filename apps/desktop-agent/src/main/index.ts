@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FileAction, PairingInput } from '../shared/types';
@@ -81,6 +81,7 @@ function registerIpc(): void {
   ipcMain.handle('conv:new', () => runtime.newConversation());
   ipcMain.handle('conv:select', (_event, id: string) => runtime.selectConversation(id));
   ipcMain.handle('conv:delete', (_event, id: string) => runtime.deleteConversation(id));
+  ipcMain.handle('conv:rename', (_event, id: string, title: string) => runtime.renameConversation(id, title));
   ipcMain.handle('fs:explore', (_event, dirPath?: string) => runtime.explore(dirPath));
   ipcMain.handle('fs:read', (_event, filePath: string) => runtime.readFileText(filePath));
   ipcMain.handle('fs:write', (_event, filePath: string, text: string) => runtime.writeFileText(filePath, text));
@@ -139,6 +140,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     app.setAppUserModelId('com.onarsuite.desktop');
+    Menu.setApplicationMenu(null); // remove the native File/Edit/View/Window bar
     if (process.defaultApp && process.argv.length >= 2) {
       app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
     } else {
