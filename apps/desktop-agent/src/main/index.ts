@@ -62,6 +62,7 @@ function registerIpc(): void {
   ipcMain.handle('files:list', () => runtime.listFiles());
   ipcMain.handle('files:parse', (_event, filePath: string) => runtime.parseFile(filePath));
   ipcMain.handle('files:open', (_event, filePath: string) => runtime.openFile(filePath));
+  ipcMain.handle('files:reveal', (_event, filePath: string) => runtime.revealFile(filePath));
   ipcMain.handle('files:action', (_event, filePath: string, action: FileAction) => runtime.performFileAction(filePath, action));
   ipcMain.handle('audit:list', () => runtime.audit.list());
   ipcMain.handle('sync:now', () => runtime.syncNow());

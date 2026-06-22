@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.12';
+export const APP_VERSION = '0.9.13';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -70,6 +70,9 @@ export interface PanelData {
   columns?: string[];
   rows?: string[][];
   text?: string;
+  /** For file panels: the absolute path (enables Open / Reveal) and a code language. */
+  path?: string;
+  lang?: string;
 }
 
 /** Events streamed from the agent loop (main) to the console (renderer). */
@@ -216,6 +219,7 @@ export interface MaxDesktopApi {
   listFiles(): Promise<LocalFile[]>;
   parseFile(filePath: string): Promise<ParsedDocument>;
   openFile(filePath: string): Promise<void>;
+  revealFile(filePath: string): Promise<void>;
   performFileAction(filePath: string, action: FileAction): Promise<ActionResult>;
   listAudit(): Promise<AuditEntry[]>;
   syncNow(): Promise<AppSnapshot>;

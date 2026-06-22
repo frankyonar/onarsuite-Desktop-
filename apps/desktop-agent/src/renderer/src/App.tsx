@@ -267,8 +267,8 @@ function PairingPage({ snapshot, busy, notice, onPair }: { snapshot: AppSnapshot
 
 const SUGGESTIONS = [
   'Crea un nuovo cliente',
-  'Cerca un file sul computer',
-  'Prepara un preventivo',
+  'Genera uno script Python che…',
+  'Crea una pagina HTML di esempio',
   'Mostrami le attività di oggi',
 ];
 
@@ -407,7 +407,13 @@ function SidePanel({ panel, onClose }: { panel: PanelData; onClose: () => void }
       {panel.subtitle && <p className="side-panel-sub">{panel.subtitle}</p>}
       {panel.fields && panel.fields.length > 0 && <dl className="side-panel-fields">{panel.fields.map((f) => <div key={f.label}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>}
       {panel.columns && panel.rows && <div className="side-panel-table"><div className="data-row head" style={{ gridTemplateColumns: panel.columns.map(() => 'minmax(0,1fr)').join(' ') }}>{panel.columns.map((c) => <span key={c}>{c}</span>)}</div>{panel.rows.map((row, i) => <div className="data-row" key={i} style={{ gridTemplateColumns: panel.columns!.map(() => 'minmax(0,1fr)').join(' ') }}>{row.map((cell, j) => <span key={j} title={cell}>{cell}</span>)}</div>)}</div>}
-      {panel.text && (panel.kind === 'file' ? <pre className="side-panel-text">{panel.text}</pre> : <p className="side-panel-text">{panel.text}</p>)}
+      {panel.kind === 'file' && panel.path && <div className="side-panel-actions">
+        <button onClick={() => void window.maxDesktop.openFile(panel.path!)}>Apri</button>
+        <button onClick={() => void window.maxDesktop.revealFile(panel.path!)}>Mostra cartella</button>
+      </div>}
+      {panel.text && (panel.kind === 'file'
+        ? <Markdown content={`\`\`\`${panel.lang ?? ''}\n${panel.text}\n\`\`\``} />
+        : <p className="side-panel-text">{panel.text}</p>)}
     </div>
   </aside>;
 }

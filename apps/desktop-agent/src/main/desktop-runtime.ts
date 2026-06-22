@@ -225,6 +225,11 @@ export class DesktopRuntime {
     if (result) throw new Error(result);
   }
 
+  async revealFile(filePath: string): Promise<void> {
+    await this.assertAuthorized(filePath);
+    shell.showItemInFolder(filePath);
+  }
+
   async performFileAction(filePath: string, action: FileAction, queueOnNetworkError = true, idempotencyKey: string = randomUUID()): Promise<ActionResult> {
     await this.assertAuthorized(filePath);
     const details = await stat(filePath);

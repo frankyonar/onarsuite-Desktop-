@@ -11,8 +11,15 @@ Lavori come un dipendente esperto che aiuta l'utente con OnarSuite e con i file 
 
 STRUMENTI (usa SOLO questi per agire — niente marcatori di testo):
 - File locali: read_file, list_dir, search_files, write_file, edit_file, create_file, delete_file (solo nelle cartelle autorizzate).
-- Shell: run_shell (npm, git, ecc.) con cwd in una cartella autorizzata.
+- Shell: run_shell (npm, git, node, python, ecc.) con cwd in una cartella autorizzata.
 - OnarSuite: onar_action(action_type, data) esegue azioni REALI sul gestionale — create_user {name,email,role_id,mobile_no?}, create_note, create_reminder, create_contract, create_ticket, create_product, calendar_create_event, drive_create_file/drive_list_items, library_search, contract_search, web_search, e altre. onar_upload(path) carica un file.
+
+GENERAZIONE FILE E CODICE:
+- Sai scrivere codice in qualsiasi linguaggio (Python, JS/TS, HTML/CSS, PHP, SQL, shell, ecc.) e generare documenti.
+- Quando l'utente chiede di generare/creare codice o un file, NON limitarti a incollarlo in chat: crealo come FILE REALE con create_file (o write_file se esiste già), poi indica il percorso. Mostra anche un breve estratto nel messaggio.
+- Se non è indicata una cartella, usa la OnarSuite Workspace (sempre autorizzata). Scegli un nome file sensato con l'estensione giusta.
+- Per progetti multi-file crea i file uno per uno; per eseguirli/testarli usa run_shell (es. "node app.js", "python main.py", "npm install").
+- Prima di modificare un file esistente, leggilo con read_file, poi usa edit_file per modifiche mirate.
 
 REGOLE TASSATIVE (la fiducia dell'utente dipende da queste):
 1. NON dichiarare MAI di aver fatto qualcosa se non dopo che lo strumento corrispondente ha restituito esito positivo. Niente "fatto", "creato", "ho letto" senza la chiamata reale e il suo risultato.
@@ -144,14 +151,31 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : 'Errore imprevisto.';
 }
 
+const LANG_BY_EXT: Record<string, string> = {
+  js: 'javascript', mjs: 'javascript', cjs: 'javascript', ts: 'typescript', tsx: 'typescript', jsx: 'javascript',
+  py: 'python', rb: 'ruby', php: 'php', go: 'go', rs: 'rust', java: 'java', c: 'c', h: 'c', cpp: 'cpp',
+  cs: 'csharp', sh: 'bash', bash: 'bash', ps1: 'powershell', sql: 'sql', html: 'xml', htm: 'xml', xml: 'xml',
+  css: 'css', scss: 'scss', json: 'json', yml: 'yaml', yaml: 'yaml', md: 'markdown', vue: 'xml', svelte: 'xml',
+};
+
+function langFor(filePath: string): string | undefined {
+  const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+  return LANG_BY_EXT[ext];
+}
+
 /** Turn a tool result into a structured right-panel preview (only the cases
- *  worth a panel: a file Max read, or an object it created/touched in OnarSuite). */
+ *  worth a panel: a file Max read/wrote, or an object it created in OnarSuite). */
 function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: boolean; content: string }): PanelData | null {
   const str = (v: unknown) => (v === undefined || v === null ? '' : String(v));
 
   if (tool === 'read_file') {
     const p = str(args.path);
-    return { kind: 'file', title: p.split(/[\\/]/).pop() || p, subtitle: p, text: result.content.slice(0, 6000), ok: result.ok };
+    return { kind: 'file', title: p.split(/[\\/]/).pop() || p, subtitle: p, path: p, lang: langFor(p), text: result.content.slice(0, 8000), ok: result.ok };
+  }
+
+  if ((tool === 'write_file' || tool === 'create_file') && result.ok) {
+    const p = str(args.path);
+    return { kind: 'file', title: p.split(/[\\/]/).pop() || p, subtitle: p, path: p, lang: langFor(p), text: str(args.content).slice(0, 8000), ok: true };
   }
 
   if (tool === 'onar_action') {

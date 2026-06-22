@@ -13,6 +13,7 @@ const api: MaxDesktopApi = {
   listFiles: () => ipcRenderer.invoke('files:list'),
   parseFile: (filePath: string) => ipcRenderer.invoke('files:parse', filePath),
   openFile: (filePath: string) => ipcRenderer.invoke('files:open', filePath),
+  revealFile: (filePath: string) => ipcRenderer.invoke('files:reveal', filePath),
   performFileAction: (filePath: string, action: FileAction) =>
     ipcRenderer.invoke('files:action', filePath, action),
   listAudit: () => ipcRenderer.invoke('audit:list'),
