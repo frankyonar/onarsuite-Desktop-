@@ -35,8 +35,8 @@ export function Card({ title, eyebrow, action, children, className = '' }: { tit
 }
 
 const ONAR_ICON = new URL('./assets/onar-icon.png', import.meta.url).href;
-const ONAR_LOGO_LIGHT = new URL('../../../build/icon.png', import.meta.url).href;
-const ONAR_LOGO_DARK = new URL('../../../build/icon-dark.png', import.meta.url).href;
+const ONAR_LOGO_LIGHT = new URL('./assets/onarsuite-logo-light.png', import.meta.url).href;
+const ONAR_LOGO_DARK = new URL('./assets/onarsuite-logo-dark.png', import.meta.url).href;
 
 /** The OnarSuite molecule app icon, used wherever the brand mark appears. */
 export function BrandMark({ size = 40 }: { size?: number }) {
@@ -55,13 +55,9 @@ export function AppLogo({ theme, planName }: { theme: 'light' | 'dark'; planName
         className="app-logo-mark"
         src={theme === 'dark' ? ONAR_LOGO_DARK : ONAR_LOGO_LIGHT}
         alt="OnarSuite"
-        width={42}
+        width={188}
         height={42}
       />
-      <div className="app-logo-copy">
-        <span className="wordmark"><strong>onar</strong>suite</span>
-        <span className="app-logo-sub">Agente Max AI</span>
-      </div>
       <span className="plan-badge">{(planName || 'PRO').toUpperCase()}</span>
     </div>
   );
