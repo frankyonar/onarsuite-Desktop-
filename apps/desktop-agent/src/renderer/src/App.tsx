@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
-import { BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard, Wordmark } from './components';
+import { AppLogo, BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard } from './components';
 
 type View = 'onarsuite' | 'clients' | 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
 type Theme = 'light' | 'dark';
@@ -20,16 +20,16 @@ function useTheme(): [Theme, () => void] {
 }
 
 const navItems: Array<{ id: View; label: string; icon: string }> = [
-  { id: 'agent', label: 'Chat Max', icon: 'â—†' },
-  { id: 'explorer', label: 'File locali', icon: 'â–¤' },
-  { id: 'folders', label: 'Cartelle autorizzate', icon: 'â–±' },
-  { id: 'logs', label: 'AttivitÃ ', icon: 'â‰¡' },
+  { id: 'agent', label: 'Chat Max', icon: '◆' },
+  { id: 'explorer', label: 'File locali', icon: '▤' },
+  { id: 'folders', label: 'Cartelle autorizzate', icon: '▱' },
+  { id: 'logs', label: 'Attività', icon: '≡' },
 ];
 
-// Secondary "tools" â€” OnarSuite modules Max can also open, kept below the chat.
+// Secondary "tools" - OnarSuite modules Max can also open, kept below the chat.
 const toolItems: Array<{ id: View; label: string; icon: string }> = [
-  { id: 'onarsuite', label: 'Moduli OnarSuite', icon: 'â—Ž' },
-  { id: 'clients', label: 'Clienti', icon: 'â—ˆ' },
+  { id: 'onarsuite', label: 'Moduli OnarSuite', icon: '◎' },
+  { id: 'clients', label: 'Clienti', icon: '◈' },
 ];
 
 export function App() {
@@ -97,7 +97,7 @@ export function App() {
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!window.maxDesktop) throw new Error('Il collegamento sicuro con Max Desktop non Ã¨ disponibile. Riavvia lâ€™app.');
+    if (!window.maxDesktop) throw new Error('Il collegamento sicuro con Max Desktop non è disponibile. Riavvia l\'app.');
     const [nextSnapshot, nextFiles, nextLogs] = await Promise.all([
       window.maxDesktop.getSnapshot(), window.maxDesktop.listFiles(), window.maxDesktop.listAudit(),
     ]);
@@ -166,16 +166,16 @@ export function App() {
 
   return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)` }}>
     <aside className="sidebar">
-      <div className="brand"><BrandMark size={34} /><div><Wordmark /><span>Agente Max AI</span></div></div>
-      <button className="new-chat" onClick={() => void newChat()}><span>ï¼‹</span>Nuova chat</button>
+      <div className="brand"><AppLogo theme={theme} planName={snapshot.planName} /></div>
+      <button className="new-chat" onClick={() => void newChat()}><span>+</span>Nuova chat</button>
       <nav>{navItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}</nav>
       <div className="conv-section">
-        <div className="conv-search"><input value={convSearch} onChange={(e) => setConvSearch(e.target.value)} placeholder="Cerca chatâ€¦" /></div>
+        <div className="conv-search"><input value={convSearch} onChange={(e) => setConvSearch(e.target.value)} placeholder="Cerca chat..." /></div>
         <div className="conv-list">
           {conversations.filter((c) => c.title.toLowerCase().includes(convSearch.toLowerCase())).map((c) => (
             <div key={c.id} className={`conv-item ${activeConv?.id === c.id ? 'active' : ''}`} onClick={() => void openConversation(c.id)}>
               <span className="conv-title">{c.title}</span>
-              <button className="conv-del" title="Elimina" onClick={(e) => { e.stopPropagation(); void removeConversation(c.id); }}>Ã—</button>
+              <button className="conv-del" title="Elimina" onClick={(e) => { e.stopPropagation(); void removeConversation(c.id); }}>×</button>
             </div>
           ))}
           {conversations.length === 0 && <p className="conv-empty">Le tue chat appariranno qui.</p>}
@@ -183,22 +183,26 @@ export function App() {
       </div>
       <div className="nav-divider">Strumenti</div>
       <nav>{toolItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}
-        <button className={view === 'settings' ? 'active' : ''} onClick={() => setView('settings')}><span>âš™</span>Impostazioni</button>
+        <button className={view === 'settings' ? 'active' : ''} onClick={() => setView('settings')}><span>⚙</span>Impostazioni</button>
       </nav>
-      <div className="sidebar-status"><StatusPill state={snapshot.connection} /><small>{snapshot.accountLabel || snapshot.deviceName}</small></div>
+      <div className="sidebar-status">
+        <StatusPill state={snapshot.connection} />
+        <small>{snapshot.accountLabel || snapshot.deviceName}</small>
+        <span className="sidebar-version">v{APP_VERSION}</span>
+      </div>
       <div className="sidebar-resizer" onMouseDown={startResize} title="Trascina per regolare la larghezza" />
     </aside>
     <main className="main-content">
       <header className="topbar">
-        <div><span className="eyebrow">ONARSUITE Â· AGENTE MAX</span><h1>{viewTitles[view]}</h1></div>
+        <div><span className="eyebrow">ONARSUITE · AGENTE MAX</span><h1>{viewTitles[view]}</h1></div>
         <div className="topbar-actions">
           {snapshot.pendingActions > 0 && <span className="queue-count">{snapshot.pendingActions} in coda</span>}
-          <button className="theme-toggle" title="Tema chiaro/scuro" onClick={toggleTheme}>{theme === 'dark' ? 'â˜€' : 'â˜¾'}</button>
+          <button className="theme-toggle" title="Tema chiaro/scuro" onClick={toggleTheme}>{theme === 'dark' ? '☀' : '☾'}</button>
           <Button variant="secondary" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}>Sincronizza</Button>
         </div>
       </header>
       <UpdateBanner state={updateState} busy={updateBusy} onAction={handleUpdateAction} />
-      {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>Ã—</button></div>}
+      {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
       {view === 'onarsuite' && <OnarHome onNotice={setNotice} onGoClients={() => setView('clients')} />}
       {view === 'clients' && <ClientsView />}
       {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} onPersist={(items) => void persistConversation(activeConv.id, items)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
@@ -212,7 +216,7 @@ export function App() {
 }
 
 function StartupScreen({ error, onRetry }: { error?: string; onRetry: () => void }) {
-  return <div className="splash"><BrandMark size={72} /><h2>{error ? 'OnarSuite non Ã¨ riuscito ad avviarsi' : 'Avvio di OnarSuiteâ€¦'}</h2>{error && <><p className="startup-error">{error}</p><Button onClick={onRetry}>Riprova</Button></>}</div>;
+  return <div className="splash"><BrandMark size={72} /><h2>{error ? 'OnarSuite non è riuscito ad avviarsi' : 'Avvio di OnarSuite…'}</h2>{error && <><p className="startup-error">{error}</p><Button onClick={onRetry}>Riprova</Button></>}</div>;
 }
 
 const ONAR_SERVER = 'https://onarsuite.com';
@@ -224,23 +228,23 @@ function PairingPage({ snapshot, busy, notice, onPair }: { snapshot: AppSnapshot
   return <div className="pairing-page">
     <section className="pairing-copy">
       <BrandMark size={64} />
-      <span className="eyebrow">ONARSUITE Â· AGENTE MAX</span>
+      <span className="eyebrow">ONARSUITE · AGENTE MAX</span>
       <h1>Il tuo dipendente digitale,<br />sul tuo computer.</h1>
       <p>Max lavora con i dati di OnarSuite e con i file locali che autorizzi.</p>
       <div className="trust-list">
-        <span>âœ“ Accesso solo alle cartelle autorizzate</span>
-        <span>âœ“ Token protetto dal sistema operativo</span>
-        <span>âœ“ Ogni azione importante viene registrata</span>
+        <span>✓ Accesso solo alle cartelle autorizzate</span>
+        <span>✓ Token protetto dal sistema operativo</span>
+        <span>✓ Ogni azione importante viene registrata</span>
       </div>
     </section>
     <Card className="pairing-card" title="Collega questo computer">
       {notice && <div className={`notice notice-${notice.tone}`}>{notice.text}</div>}
-      <Button className="web-login-btn" onClick={() => void window.maxDesktop.webLogin(ONAR_SERVER, APP_VERSION)}>Accedi con OnarSuite â†’</Button>
+      <Button className="web-login-btn" onClick={() => void window.maxDesktop.webLogin(ONAR_SERVER, APP_VERSION)}>Accedi con OnarSuite →</Button>
       <small className="form-note">Si apre il browser per il login, poi torni qui in automatico.</small>
       <div className="auth-divider"><span>oppure usa un codice di pairing</span></div>
       <form onSubmit={(event) => { event.preventDefault(); onPair({ serverUrl: ONAR_SERVER, deviceName, pairingCode: pairingCode || undefined }); }}>
         <label>Codice pairing<input value={pairingCode} onChange={(event) => setPairingCode(event.target.value)} placeholder="es. 7F3A9C" autoFocus /></label>
-        <Button variant="secondary" disabled={busy || !pairingCode.trim()}>{busy ? 'Collegamentoâ€¦' : 'Collega con codice'}</Button>
+        <Button variant="secondary" disabled={busy || !pairingCode.trim()}>{busy ? 'Collegamento…' : 'Collega con codice'}</Button>
       </form>
     </Card>
   </div>;
@@ -250,7 +254,7 @@ const SUGGESTIONS = [
   'Crea un nuovo cliente',
   'Cerca un file sul computer',
   'Prepara un preventivo',
-  'Mostrami le attivitÃ  di oggi',
+  'Mostrami le attività di oggi',
 ];
 
 function AgentConsole({ convId, initialItems, onPersist, attachments, onAttachmentsChange, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; attachments: LocalFile[]; onAttachmentsChange: (files: LocalFile[]) => void; onAfterRun: () => void; accountLabel?: string }) {
@@ -286,10 +290,10 @@ function AgentConsole({ convId, initialItems, onPersist, attachments, onAttachme
     const filePaths = attachments.map((file) => file.path);
     setText('');
     setItems((prev) => [...prev, { kind: 'user', id: crypto.randomUUID(), text: message || '[allegati]' }]);
-    setRunning(true); setStatus('Max sta pensandoâ€¦');
+    setRunning(true); setStatus('Max sta pensando…');
     onAttachmentsChange([]);
     try { await window.maxDesktop.runAgent({ message, history: [], filePaths }); }
-    catch (error) { setItems((prev) => [...prev, { kind: 'assistant', id: crypto.randomUUID(), text: `âš ï¸ ${errorText(error)}` }]); setRunning(false); setStatus(undefined); }
+    catch (error) { setItems((prev) => [...prev, { kind: 'assistant', id: crypto.randomUUID(), text: `⚠ ${errorText(error)}` }]); setRunning(false); setStatus(undefined); }
     finally { onAfterRun(); }
   };
 
@@ -333,7 +337,7 @@ function AgentConsole({ convId, initialItems, onPersist, attachments, onAttachme
       {attachments.map((file) => (
         <span key={file.path} className="composer-chip">
           <span className="composer-chip-name" title={file.name}>{file.name}</span>
-          <button type="button" onClick={() => removeAttachment(file.path)} title={`Rimuovi ${file.name}`}>Ã—</button>
+          <button type="button" onClick={() => removeAttachment(file.path)} title={`Rimuovi ${file.name}`}>×</button>
         </span>
       ))}
       <button type="button" className="composer-clear" onClick={() => onAttachmentsChange([])} title="Rimuovi tutti">Pulisci</button>
@@ -341,13 +345,13 @@ function AgentConsole({ convId, initialItems, onPersist, attachments, onAttachme
     <textarea value={text} rows={1}
       onChange={(event) => { setText(event.target.value); grow(event.target); }}
       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(e); } }}
-      placeholder="Scrivi a Maxâ€¦" />
+      placeholder="Scrivi a Max…" />
     <div className="composer-toolbar">
-      <button type="button" className="composer-attach" onClick={() => void attach()} title="Allega uno o piu file">ï¼‹</button>
-      <span className="composer-mode" title="Max agisce in autonomia; ogni azione Ã¨ registrata">Autonomo</span>
+      <button type="button" className="composer-attach" onClick={() => void attach()} title="Allega uno o più file">+</button>
+      <span className="composer-mode" title="Max agisce in autonomia; ogni azione è registrata">Autonomo</span>
       {running
-        ? <button type="button" className="composer-send stop" onClick={stop} title="Ferma">â– </button>
-        : <button type="submit" className="composer-send" disabled={!text.trim() && attachments.length === 0} title="Invia">â†‘</button>}
+        ? <button type="button" className="composer-send stop" onClick={stop} title="Ferma">■</button>
+        : <button type="submit" className="composer-send" disabled={!text.trim() && attachments.length === 0} title="Invia">↑</button>}
     </div>
   </form>;
 
@@ -364,7 +368,7 @@ function AgentConsole({ convId, initialItems, onPersist, attachments, onAttachme
           <div className="console-stream" ref={streamRef}>
             <div className="console-thread">
               {items.map((item) => <ConsoleRow key={item.id} item={item} />)}
-              {running && <div className="agent-indicator"><span className="dots"><i /><i /><i /></span>{status || 'Max sta lavorandoâ€¦'}</div>}
+              {running && <div className="agent-indicator"><span className="dots"><i /><i /><i /></span>{status || 'Max sta lavorando…'}</div>}
             </div>
           </div>
           {composer}
@@ -378,12 +382,12 @@ function SidePanel({ panel, onClose }: { panel: PanelData; onClose: () => void }
   return <aside className="side-panel">
     <header className="side-panel-head">
       <span className="side-panel-kind">{PANEL_LABELS[panel.kind]}</span>
-      <button onClick={onClose} title="Chiudi">Ã—</button>
+      <button onClick={onClose} title="Chiudi">×</button>
     </header>
     <div className="side-panel-body">
       <div className="side-panel-title">
         <strong>{panel.title}</strong>
-        {panel.ok !== undefined && <span className={`pill ${panel.ok ? 'ok' : 'err'}`}>{panel.ok ? 'âœ“' : 'âœ—'}</span>}
+        {panel.ok !== undefined && <span className={`pill ${panel.ok ? 'ok' : 'err'}`}>{panel.ok ? '✓' : '✗'}</span>}
       </div>
       {panel.subtitle && <p className="side-panel-sub">{panel.subtitle}</p>}
       {panel.fields && panel.fields.length > 0 && <dl className="side-panel-fields">{panel.fields.map((f) => <div key={f.label}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>}
@@ -419,7 +423,7 @@ function reduceEvent(prev: ConsoleItem[], event: AgentStreamEvent): ConsoleItem[
         ? { ...item, status: event.ok ? 'done' : 'error', preview: event.preview, isDiff: event.isDiff }
         : item);
     case 'error':
-      return [...prev, { kind: 'assistant', id: crypto.randomUUID(), text: `âš ï¸ ${event.message}` }];
+      return [...prev, { kind: 'assistant', id: crypto.randomUUID(), text: `⚠ ${event.message}` }];
     default:
       return prev;
   }
@@ -436,23 +440,23 @@ type ModuleDef = {
 };
 
 const MODULES: ModuleDef[] = [
-  { id: 'reminders', label: 'Promemoria', icon: 'â—·', hint: 'Scadenze e attivitÃ ',
+  { id: 'reminders', label: 'Promemoria', icon: '◌', hint: 'Scadenze e attività',
     listAction: 'list_reminders', listKey: 'reminders',
-    columns: [{ key: 'title', label: 'Titolo' }, { key: 'date', label: 'Scadenza' }, { key: 'priority', label: 'PrioritÃ ' }],
+    columns: [{ key: 'title', label: 'Titolo' }, { key: 'date', label: 'Scadenza' }, { key: 'priority', label: 'Priorità' }],
     createAction: 'create_reminder', createLabel: 'Nuovo promemoria',
-    fields: [{ key: 'title', label: 'Titolo', required: true }, { key: 'date', label: 'Scadenza', type: 'date' }, { key: 'priority', label: 'PrioritÃ ', placeholder: 'low Â· medium Â· high' }, { key: 'description', label: 'Note', type: 'textarea' }],
-    rowActions: [{ label: 'âœ“ Completa', action: 'complete_reminder' }] },
-  { id: 'leads', label: 'Clienti', icon: 'â—‰', hint: 'CRM e contatti',
+    fields: [{ key: 'title', label: 'Titolo', required: true }, { key: 'date', label: 'Scadenza', type: 'date' }, { key: 'priority', label: 'Priorità', placeholder: 'low · medium · high' }, { key: 'description', label: 'Note', type: 'textarea' }],
+    rowActions: [{ label: '✓ Completa', action: 'complete_reminder' }] },
+  { id: 'leads', label: 'Clienti', icon: '◎', hint: 'CRM e contatti',
     listAction: 'list_leads', listKey: 'leads',
     columns: [{ key: 'name', label: 'Nome' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Telefono' }],
     createAction: 'create_customer', createLabel: 'Nuovo cliente',
     fields: [{ key: 'name', label: 'Nome', required: true }, { key: 'email', label: 'Email', type: 'email' }, { key: 'phone', label: 'Telefono' }, { key: 'notes', label: 'Note', type: 'textarea' }] },
-  { id: 'contracts', label: 'Contratti', icon: 'â–¤', hint: 'Contratti e bozze',
+  { id: 'contracts', label: 'Contratti', icon: '▤', hint: 'Contratti e bozze',
     listAction: 'contract_list', listKey: 'contracts',
     columns: [{ key: 'title', label: 'Titolo' }, { key: 'client', label: 'Cliente' }, { key: 'status', label: 'Stato' }, { key: 'amount', label: 'Importo', kind: 'amount' }],
     createAction: 'create_contract', createLabel: 'Nuovo contratto',
     fields: [{ key: 'title', label: 'Titolo', required: true }, { key: 'description', label: 'Descrizione', type: 'textarea' }, { key: 'amount', label: 'Importo (EUR)', type: 'number' }] },
-  { id: 'users', label: 'Utenti', icon: 'â—', hint: 'Team e accessi',
+  { id: 'users', label: 'Utenti', icon: '◍', hint: 'Team e accessi',
     listAction: 'list_users', listKey: 'users',
     columns: [{ key: 'name', label: 'Nome' }, { key: 'email', label: 'Email' }, { key: 'type', label: 'Ruolo' }],
     createAction: 'create_user', createLabel: 'Nuovo utente',
@@ -460,12 +464,12 @@ const MODULES: ModuleDef[] = [
 ];
 
 const COMING: Array<{ label: string; icon: string; hint: string }> = [
-  { label: 'Calendario', icon: 'â–¥', hint: 'Eventi e appuntamenti' },
-  { label: 'Prodotti', icon: 'â–¦', hint: 'Catalogo e magazzino' },
-  { label: 'Preventivi', icon: 'â–£', hint: 'Offerte commerciali' },
-  { label: 'Fatture', icon: 'â‚¬', hint: 'Fatturazione' },
-  { label: 'Email', icon: 'âœ‰', hint: 'Posta Max AI' },
-  { label: 'Ticket', icon: 'â—«', hint: 'Assistenza' },
+  { label: 'Calendario', icon: '▥', hint: 'Eventi e appuntamenti' },
+  { label: 'Prodotti', icon: '▦', hint: 'Catalogo e magazzino' },
+  { label: 'Preventivi', icon: '▣', hint: 'Offerte commerciali' },
+  { label: 'Fatture', icon: '€', hint: 'Fatturazione' },
+  { label: 'Email', icon: '✉', hint: 'Posta Max AI' },
+  { label: 'Ticket', icon: '◫', hint: 'Assistenza' },
 ];
 
 function OnarHome({ onNotice, onGoClients }: { onNotice: (n: Notice) => void; onGoClients: () => void }) {
@@ -473,7 +477,7 @@ function OnarHome({ onNotice, onGoClients }: { onNotice: (n: Notice) => void; on
   const def = MODULES.find((m) => m.id === moduleId);
   if (def) return <ModuleScreen def={def} onBack={() => setModuleId(undefined)} onNotice={onNotice} />;
   return <div className="onar-home">
-    <Card className="onar-banner"><div><span className="eyebrow">GESTIONALE NATIVO</span><h2>OnarSuite Desktop Ã¨ autonomo</h2><p>Qui lavoriamo solo con schermate native, dati reali e azioni verso il backend. Nessun salto al web: costruiamo i moduli dentro lâ€™app.</p><div className="hero-actions"><Button onClick={onGoClients}>Apri Clienti</Button></div></div></Card>
+    <Card className="onar-banner"><div><span className="eyebrow">GESTIONALE NATIVO</span><h2>OnarSuite Desktop è autonomo</h2><p>Qui lavoriamo solo con schermate native, dati reali e azioni verso il backend. Nessun salto al web: costruiamo i moduli dentro l'app.</p><div className="hero-actions"><Button onClick={onGoClients}>Apri Clienti</Button></div></div></Card>
     <div className="module-grid">
       {MODULES.map((m) => <button key={m.id} className="module-card" onClick={() => setModuleId(m.id)}><span className="module-icon">{m.icon}</span><strong>{m.label}</strong><small>{m.hint}</small></button>)}
       {COMING.map((m) => <div key={m.label} className="module-card disabled"><span className="module-icon">{m.icon}</span><strong>{m.label}</strong><small>{m.hint}</small><span className="soon">in arrivo</span></div>)}
@@ -527,17 +531,17 @@ function ModuleScreen({ def, onBack, onNotice }: { def: ModuleDef; onBack: () =>
   const gridCols = { gridTemplateColumns: [...def.columns.map(() => 'minmax(0, 1fr)'), ...(def.rowActions ? ['150px'] : [])].join(' ') };
 
   return <Card className="module-screen" eyebrow={def.hint} title={def.label}
-    action={<div className="module-actions"><Button variant="ghost" onClick={onBack}>â† Moduli</Button>{def.createAction && <Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Annulla' : (def.createLabel ?? 'Nuovo')}</Button>}</div>}>
+    action={<div className="module-actions"><Button variant="ghost" onClick={onBack}>← Moduli</Button>{def.createAction && <Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Annulla' : (def.createLabel ?? 'Nuovo')}</Button>}</div>}>
     {showForm && def.fields && <form className="module-form" onSubmit={submit}>
       {def.fields.map((f) => <label key={f.key}>{f.label}{f.required && ' *'}
         {f.type === 'textarea'
           ? <textarea value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} rows={3} placeholder={f.placeholder} />
           : <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : 'text'} value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} required={f.required} placeholder={f.placeholder} />}
       </label>)}
-      <Button disabled={busy}>{busy ? 'Salvataggioâ€¦' : 'Salva su OnarSuite'}</Button>
+      <Button disabled={busy}>{busy ? 'Salvataggio…' : 'Salva su OnarSuite'}</Button>
     </form>}
     {!showForm && (loading
-      ? <p className="muted-line">Carico i dati da OnarSuiteâ€¦</p>
+      ? <p className="muted-line">Carico i dati da OnarSuite…</p>
       : rows.length === 0
         ? <EmptyState icon={def.icon} title="Nessun dato">{def.createAction ? 'Crea il primo elemento con il pulsante in alto.' : 'Niente da mostrare.'}</EmptyState>
         : <div className="data-table">
@@ -551,7 +555,7 @@ function ModuleScreen({ def, onBack, onNotice }: { def: ModuleDef; onBack: () =>
 }
 
 function fmtCell(value: unknown, kind: string | undefined, row: Record<string, unknown>): string {
-  if (value === null || value === undefined || value === '') return 'â€”';
+  if (value === null || value === undefined || value === '') return '—';
   if (kind === 'amount') { const cur = (row.currency as string) || 'EUR'; return `${Number(value).toLocaleString('it-IT')} ${cur}`; }
   return String(value);
 }
@@ -592,29 +596,29 @@ function ExplorerView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'er
   };
 
   return <div className="explorer">
-    <Card className="explorer-tree" title="File" eyebrow={current ? shortPath(current) : 'CARTELLE AUTORIZZATE'} action={stack.length > 0 ? <Button variant="ghost" onClick={() => { setStack((s) => s.slice(0, -1)); }}>â†‘ Su</Button> : undefined}>
+    <Card className="explorer-tree" title="File" eyebrow={current ? shortPath(current) : 'CARTELLE AUTORIZZATE'} action={stack.length > 0 ? <Button variant="ghost" onClick={() => { setStack((s) => s.slice(0, -1)); }}>↑ Su</Button> : undefined}>
       <div className="entry-list">
-        {busy && entries.length === 0 && <p className="muted-line">Caricoâ€¦</p>}
+        {busy && entries.length === 0 && <p className="muted-line">Carico…</p>}
         {entries.map((entry) => <button key={entry.path} className={`entry ${openPath === entry.path ? 'selected' : ''}`} onClick={() => void openEntry(entry)}>
-          <span className="entry-icon">{entry.kind === 'dir' ? 'â–¸' : iconFor(entry.extension)}</span>
+          <span className="entry-icon">{entry.kind === 'dir' ? '▸' : iconFor(entry.extension)}</span>
           <span className="entry-name">{entry.name}</span>
           {entry.kind === 'file' && entry.size !== undefined && <time>{formatBytes(entry.size)}</time>}
         </button>)}
-        {!busy && entries.length === 0 && <EmptyState icon="â–±" title="Cartella vuota">Nessun file qui.</EmptyState>}
+        {!busy && entries.length === 0 && <EmptyState icon="▱" title="Cartella vuota">Nessun file qui.</EmptyState>}
       </div>
     </Card>
     <Card className="editor" eyebrow={truncated ? 'ANTEPRIMA (TRONCATA)' : 'EDITOR'} title={openPath ? shortPath(openPath) : 'Nessun file aperto'} action={openPath ? <Button disabled={!dirty} onClick={() => void save()}>{dirty ? 'Salva' : 'Salvato'}</Button> : undefined}>
-      {openPath ? <textarea className="code-editor" value={content} spellCheck={false} onChange={(event) => { setContent(event.target.value); setDirty(true); }} /> : <EmptyState icon="â†" title="Apri un file">Naviga e seleziona un file per leggerlo o modificarlo.</EmptyState>}
+      {openPath ? <textarea className="code-editor" value={content} spellCheck={false} onChange={(event) => { setContent(event.target.value); setDirty(true); }} /> : <EmptyState icon="←" title="Apri un file">Naviga e seleziona un file per leggerlo o modificarlo.</EmptyState>}
     </Card>
   </div>;
 }
 
-function Dashboard({ snapshot, files, logs, onGoAgent, onSync }: { snapshot: AppSnapshot; files: LocalFile[]; logs: AuditEntry[]; onGoAgent: () => void; onSync: () => void }) { return <div className="page-grid"><Card className="hero-card"><div className="hero-copy"><span className="eyebrow">DIPENDENTE DIGITALE</span><h2>{snapshot.connection === 'connected' ? 'Max Ã¨ pronto a lavorare.' : 'Max Ã¨ offline.'}</h2><p>Dai a Max un obiettivo: legge i file, esegue comandi e crea cose in OnarSuite, in autonomia e con audit completo.</p><div className="hero-actions"><Button onClick={onGoAgent}>Apri lâ€™agente</Button><Button variant="secondary" onClick={onSync}>Controlla connessione</Button></div></div><div className="orb"><BrandMark size={84} /><StatusPill state={snapshot.connection} /></div></Card><div className="stats-grid"><Stat label="Documenti visibili" value={String(files.length)} detail="Workspace e cartelle autorizzate" /><Stat label="Cartelle autorizzate" value={String(snapshot.authorizedFolders.length)} detail="Ambito operativo di Max" /><Stat label="Ultimo sync" value={snapshot.lastSyncAt ? formatDate(snapshot.lastSyncAt) : 'Mai'} detail={`Versione ${snapshot.appVersion}`} /></div><Card title="AttivitÃ  recenti">{logs.length ? <div className="activity-list">{logs.slice(0, 6).map((log) => <div key={log.id}><span className={`log-dot ${log.level}`} /><div><strong>{log.message}</strong><small>{formatDate(log.createdAt)} Â· {log.eventType}</small></div></div>)}</div> : <EmptyState icon="â—Ž" title="Nessuna attivitÃ ">Le azioni di Max appariranno qui.</EmptyState>}</Card></div>; }
+function Dashboard({ snapshot, files, logs, onGoAgent, onSync }: { snapshot: AppSnapshot; files: LocalFile[]; logs: AuditEntry[]; onGoAgent: () => void; onSync: () => void }) { return <div className="page-grid"><Card className="hero-card"><div className="hero-copy"><span className="eyebrow">DIPENDENTE DIGITALE</span><h2>{snapshot.connection === 'connected' ? 'Max è pronto a lavorare.' : 'Max è offline.'}</h2><p>Dai a Max un obiettivo: legge i file, esegue comandi e crea cose in OnarSuite, in autonomia e con audit completo.</p><div className="hero-actions"><Button onClick={onGoAgent}>Apri l'agente</Button><Button variant="secondary" onClick={onSync}>Controlla connessione</Button></div></div><div className="orb"><BrandMark size={84} /><StatusPill state={snapshot.connection} /></div></Card><div className="stats-grid"><Stat label="Documenti visibili" value={String(files.length)} detail="Workspace e cartelle autorizzate" /><Stat label="Cartelle autorizzate" value={String(snapshot.authorizedFolders.length)} detail="Ambito operativo di Max" /><Stat label="Ultimo sync" value={snapshot.lastSyncAt ? formatDate(snapshot.lastSyncAt) : 'Mai'} detail={`Versione ${snapshot.appVersion}`} /></div><Card title="Attività recenti">{logs.length ? <div className="activity-list">{logs.slice(0, 6).map((log) => <div key={log.id}><span className={`log-dot ${log.level}`} /><div><strong>{log.message}</strong><small>{formatDate(log.createdAt)} · {log.eventType}</small></div></div>)}</div> : <EmptyState icon="◎" title="Nessuna attività">Le azioni di Max appariranno qui.</EmptyState>}</Card></div>; }
 function Stat({ label, value, detail }: { label: string; value: string; detail: string }) { return <Card><span className="stat-label">{label}</span><strong className="stat-value">{value}</strong><small>{detail}</small></Card>; }
 
-function FoldersView({ snapshot, busy, onAdd, onRemove, onDrop, onChoose }: { snapshot: AppSnapshot; busy: boolean; onAdd: () => void; onRemove: (folder: string) => void; onDrop: (event: DragEvent) => void; onChoose: () => void }) { return <div className="page-grid"><Card title="Ambito operativo di Max" action={<Button disabled={busy} onClick={onAdd}>Aggiungi cartella</Button>}><div className="permission-banner"><strong>Max lavora solo nelle cartelle qui sotto.</strong><span>Dentro lâ€™allowlist puÃ² leggere, scrivere, modificare ed eseguire comandi. Fuori, Ã¨ bloccato.</span></div><div className="drop-zone" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}><span>ï¼‹</span><div><strong>Trascina qui i documenti</strong><small>per copiarli nella OnarSuite Workspace</small></div><Button variant="secondary" onClick={onChoose}>Scegli file</Button></div><div className="folder-list"><div><span className="folder-icon">â–°</span><div><strong>OnarSuite Workspace</strong><small>{snapshot.workspacePath}</small></div><span className="fixed-badge">Sempre attiva</span></div>{snapshot.authorizedFolders.map((folder) => <div key={folder}><span className="folder-icon">â–°</span><div><strong>{folder.split(/[\\/]/).pop()}</strong><small>{folder}</small></div><Button variant="ghost" onClick={() => onRemove(folder)}>Rimuovi</Button></div>)}</div></Card><Card title="Permessi"><div className="scope-columns"><div><strong>Consentiti (in autonomia)</strong>{MVP_SCOPES.map((scope) => <span key={scope} className="scope allowed">âœ“ {scope}</span>)}</div><div><strong>Sempre bloccati</strong>{BLOCKED_SCOPES.map((scope) => <span key={scope} className="scope blocked">Ã— {scope}</span>)}</div></div></Card></div>; }
+function FoldersView({ snapshot, busy, onAdd, onRemove, onDrop, onChoose }: { snapshot: AppSnapshot; busy: boolean; onAdd: () => void; onRemove: (folder: string) => void; onDrop: (event: DragEvent) => void; onChoose: () => void }) { return <div className="page-grid"><Card title="Ambito operativo di Max" action={<Button disabled={busy} onClick={onAdd}>Aggiungi cartella</Button>}><div className="permission-banner"><strong>Max lavora solo nelle cartelle qui sotto.</strong><span>Dentro l'allowlist può leggere, scrivere, modificare ed eseguire comandi. Fuori, è bloccato.</span></div><div className="drop-zone" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}><span>+</span><div><strong>Trascina qui i documenti</strong><small>per copiarli nella OnarSuite Workspace</small></div><Button variant="secondary" onClick={onChoose}>Scegli file</Button></div><div className="folder-list"><div><span className="folder-icon">▰</span><div><strong>OnarSuite Workspace</strong><small>{snapshot.workspacePath}</small></div><span className="fixed-badge">Sempre attiva</span></div>{snapshot.authorizedFolders.map((folder) => <div key={folder}><span className="folder-icon">▰</span><div><strong>{folder.split(/[\\/]/).pop()}</strong><small>{folder}</small></div><Button variant="ghost" onClick={() => onRemove(folder)}>Rimuovi</Button></div>)}</div></Card><Card title="Permessi"><div className="scope-columns"><div><strong>Consentiti (in autonomia)</strong>{MVP_SCOPES.map((scope) => <span key={scope} className="scope allowed">✓ {scope}</span>)}</div><div><strong>Sempre bloccati</strong>{BLOCKED_SCOPES.map((scope) => <span key={scope} className="scope blocked">× {scope}</span>)}</div></div></Card></div>; }
 
-function LogsView({ logs }: { logs: AuditEntry[] }) { return <Card title="Registro attivitÃ " eyebrow="AUDIT LOCALE"><div className="log-table"><div className="log-row head"><span>Data</span><span>Evento</span><span>Livello</span><span>Messaggio</span></div>{logs.map((log) => <div className="log-row" key={log.id}><span>{formatDate(log.createdAt)}</span><code>{log.eventType}</code><span><i className={`log-dot ${log.level}`} />{log.level}</span><strong>{log.message}</strong></div>)}</div>{!logs.length && <EmptyState icon="â‰¡" title="Registro vuoto">Le azioni e gli errori compariranno qui.</EmptyState>}</Card>; }
+function LogsView({ logs }: { logs: AuditEntry[] }) { return <Card title="Registro attività" eyebrow="AUDIT LOCALE"><div className="log-table"><div className="log-row head"><span>Data</span><span>Evento</span><span>Livello</span><span>Messaggio</span></div>{logs.map((log) => <div className="log-row" key={log.id}><span>{formatDate(log.createdAt)}</span><code>{log.eventType}</code><span><i className={`log-dot ${log.level}`} />{log.level}</span><strong>{log.message}</strong></div>)}</div>{!logs.length && <EmptyState icon="≡" title="Registro vuoto">Le azioni e gli errori compariranno qui.</EmptyState>}</Card>; }
 
 function SettingsView({ snapshot, busy, onDisconnect, onClear }: { snapshot: AppSnapshot; busy: boolean; onDisconnect: () => void; onClear: () => void }) { return <div className="page-grid settings-grid"><Card title="Dispositivo"><dl><dt>Nome</dt><dd>{snapshot.deviceName}</dd><dt>ID dispositivo</dt><dd>{snapshot.deviceId}</dd><dt>Server</dt><dd>{snapshot.serverUrl}</dd><dt>Versione</dt><dd>{snapshot.appVersion}</dd><dt>Token locale</dt><dd>{snapshot.encryptionAvailable ? 'Cifrato con il sistema operativo' : 'Non persistito'}</dd></dl><Button variant="danger" disabled={busy} onClick={onDisconnect}>Disconnetti dispositivo</Button></Card><Card title="Privacy e dati locali"><p>Puoi cancellare configurazione, token, coda offline e audit locale. I documenti nelle cartelle autorizzate non vengono eliminati automaticamente.</p><Button variant="secondary" disabled={busy} onClick={onClear}>Cancella dati locali</Button></Card></div>; }
 
@@ -632,9 +636,9 @@ function UpdateBanner({ state, busy, onAction }: { state: UpdateState; busy: boo
           ? 'Controllo aggiornamenti in corso'
           : 'Aggiornamento non riuscito';
   const message = state.status === 'available'
-    ? 'Scarica lâ€™update e riavvia lâ€™app quando sei pronto.'
+    ? "Scarica l'update e riavvia l'app quando sei pronto."
     : state.status === 'downloading'
-      ? `Download in corso${state.totalBytes ? ` Â· ${percent}%` : ''}`
+      ? `Download in corso${state.totalBytes ? ` · ${percent}%` : ''}`
       : state.status === 'downloaded'
         ? 'Riavvia per installare la nuova release.'
         : state.error || 'Riprova il controllo degli aggiornamenti.';
@@ -725,7 +729,7 @@ function ClientsView() {
         title="Clienti"
         eyebrow="HUB NATIVO"
       >
-        <p>Qui stiamo portando il cuore CRM di OnarSuite in una versione nativa: utenti interni e clienti/lead, senza uscire dallâ€™app.</p>
+        <p>Qui stiamo portando il cuore CRM di OnarSuite in una versione nativa: utenti interni e clienti/lead, senza uscire dall'app.</p>
       </Card>
       <div className="stats-grid">
         <Card><span className="stat-label">Utenti</span><strong className="stat-value">{users.length}</strong><small>Team e accessi</small></Card>
@@ -738,12 +742,12 @@ function ClientsView() {
             <div className="data-table compact">
               {users.map((user) => (
                 <div key={String(user.id)} className="data-row">
-                  <strong>{String(user.name ?? 'â€”')}</strong>
-                  <span>{String(user.email ?? 'â€”')}</span>
-                  <span>{String(user.type ?? 'â€”')}</span>
+                  <strong>{String(user.name ?? '—')}</strong>
+                  <span>{String(user.email ?? '—')}</span>
+                  <span>{String(user.type ?? '—')}</span>
                 </div>
               ))}
-              {!users.length && <EmptyState icon="â—Œ" title="Nessun utente">Non ci sono utenti da mostrare.</EmptyState>}
+              {!users.length && <EmptyState icon="◌" title="Nessun utente">Non ci sono utenti da mostrare.</EmptyState>}
             </div>
           )}
           <form className="module-form" onSubmit={submitUser}>
@@ -758,12 +762,12 @@ function ClientsView() {
             <div className="data-table compact">
               {leads.map((lead) => (
                 <div key={String(lead.id)} className="data-row">
-                  <strong>{String(lead.name ?? 'â€”')}</strong>
-                  <span>{String(lead.email ?? 'â€”')}</span>
-                  <span>{String(lead.phone ?? 'â€”')}</span>
+                  <strong>{String(lead.name ?? '—')}</strong>
+                  <span>{String(lead.email ?? '—')}</span>
+                  <span>{String(lead.phone ?? '—')}</span>
                 </div>
               ))}
-              {!leads.length && <EmptyState icon="â—‰" title="Nessun lead">Non ci sono lead da mostrare.</EmptyState>}
+              {!leads.length && <EmptyState icon="◉" title="Nessun lead">Non ci sono lead da mostrare.</EmptyState>}
             </div>
           )}
           <form className="module-form" onSubmit={submitLead}>
@@ -779,15 +783,15 @@ function ClientsView() {
   );
 }
 
-const viewTitles: Record<View, string> = { onarsuite: 'OnarSuite', clients: 'Clienti', agent: 'Agente Max', explorer: 'Esplora file', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'AttivitÃ ', settings: 'Impostazioni' };
-function iconFor(ext?: string) { if (!ext) return 'â–¢'; if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return 'â–¤'; if (['xlsx', 'csv'].includes(ext)) return 'â–¦'; if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) return 'â–£'; return 'â—‡'; }
-function shortPath(value: string) { const parts = value.split(/[\\/]/); return parts.length > 3 ? `â€¦/${parts.slice(-3).join('/')}` : value; }
+const viewTitles: Record<View, string> = { onarsuite: 'OnarSuite', clients: 'Clienti', agent: 'Agente Max', explorer: 'Esplora file', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
+function iconFor(ext?: string) { if (!ext) return '▢'; if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return '▤'; if (['xlsx', 'csv'].includes(ext)) return '▦'; if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) return '▣'; return '◇'; }
+function shortPath(value: string) { const parts = value.split(/[\\/]/); return parts.length > 3 ? `…/${parts.slice(-3).join('/')}` : value; }
 function formatBytes(value: number) { if (value < 1024) return `${value} B`; if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`; return `${(value / 1024 ** 2).toFixed(1)} MB`; }
 function formatDate(value: string) { return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
 function errorText(error: unknown) {
   if (!(error instanceof Error)) return 'Errore imprevisto.';
   let msg = error.message.replace(/^Error invoking remote method '[^']+': Error: /, '');
-  // Never surface raw JSON / HTTP status to the user â€” extract the message field.
+  // Never surface raw JSON / HTTP status to the user - extract the message field.
   const jsonStart = msg.indexOf('{');
   if (jsonStart >= 0) {
     try {
@@ -796,6 +800,6 @@ function errorText(error: unknown) {
     } catch { msg = msg.slice(0, jsonStart).trim() || msg; }
   }
   msg = msg.replace(/^OnarSuite ha risposto \d+:\s*/, '').trim();
-  return msg || 'Si Ã¨ verificato un errore.';
+  return msg || 'Si è verificato un errore.';
 }
 

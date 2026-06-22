@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.8';
+export const APP_VERSION = '0.9.10';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -120,6 +120,7 @@ export interface PairingResponse {
   refresh_token?: string;
   expires_at?: string;
   account_label?: string;
+  plan_name?: string;
 }
 
 export interface AppSnapshot {
@@ -129,6 +130,7 @@ export interface AppSnapshot {
   deviceId?: string;
   deviceName: string;
   accountLabel?: string;
+  planName?: string;
   workspacePath: string;
   authorizedFolders: string[];
   permissions: string[];

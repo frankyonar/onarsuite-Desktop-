@@ -63,6 +63,7 @@ export class DesktopRuntime {
       deviceId: config.deviceId,
       deviceName: config.deviceName,
       accountLabel: config.accountLabel,
+      planName: config.planName,
       workspacePath: config.workspacePath,
       authorizedFolders: config.authorizedFolders,
       permissions: config.permissions,
@@ -82,6 +83,7 @@ export class DesktopRuntime {
       deviceId: paired.device_id,
       deviceUuid: paired.device_uuid,
       accountLabel: paired.account_label,
+      planName: paired.plan_name,
       tokenExpiresAt: paired.expires_at,
     });
     this.connection = 'connected';
@@ -95,7 +97,7 @@ export class DesktopRuntime {
   }
 
   /** Store the token/device received from the web deep-link login. */
-  async applyDeepLinkAuth(params: { token: string; deviceId: string; deviceUuid?: string; account?: string; server?: string }): Promise<void> {
+  async applyDeepLinkAuth(params: { token: string; deviceId: string; deviceUuid?: string; account?: string; planName?: string; plan?: string; server?: string }): Promise<void> {
     if (params.server) {
       try { validateHttpsUrl(params.server); await this.config.update({ serverUrl: params.server.replace(/\/+$/, '') }); } catch { /* keep configured server */ }
     }
@@ -104,6 +106,7 @@ export class DesktopRuntime {
       deviceId: params.deviceId,
       deviceUuid: params.deviceUuid,
       accountLabel: params.account,
+      planName: params.planName || params.plan,
     });
     this.connection = 'connected';
     await this.audit.write('device_paired', 'security', 'Collegato a OnarSuite via login web', { deviceId: params.deviceId, tokenPersisted: tokenSaved });

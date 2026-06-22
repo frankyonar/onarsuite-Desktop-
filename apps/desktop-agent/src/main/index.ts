@@ -108,6 +108,8 @@ async function handleDeepLink(url?: string): Promise<void> {
       deviceId,
       deviceUuid: parsed.searchParams.get('device_uuid') ?? undefined,
       account: parsed.searchParams.get('account') ?? undefined,
+      planName: parsed.searchParams.get('plan_name') ?? undefined,
+      plan: parsed.searchParams.get('plan') ?? undefined,
       server: parsed.searchParams.get('server') ?? undefined,
     });
     focusWindow();

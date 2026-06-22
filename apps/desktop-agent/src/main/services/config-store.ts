@@ -10,6 +10,7 @@ export interface StoredConfig {
   deviceUuid?: string;
   deviceName: string;
   accountLabel?: string;
+  planName?: string;
   encryptedToken?: string;
   tokenExpiresAt?: string;
   installationId: string;
@@ -63,6 +64,7 @@ export class ConfigStore {
       deviceId: undefined,
       deviceUuid: undefined,
       accountLabel: undefined,
+      planName: undefined,
       encryptedToken: undefined,
       tokenExpiresAt: undefined,
       lastSyncAt: undefined,
