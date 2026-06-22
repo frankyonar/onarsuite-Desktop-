@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.7';
+export const APP_VERSION = '0.9.8';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -59,12 +59,26 @@ export interface AgentMessage {
   name?: string;
 }
 
+/** Structured preview shown in the right-hand panel when Max produces an object. */
+export interface PanelField { label: string; value: string; }
+export interface PanelData {
+  kind: 'customer' | 'contract' | 'file' | 'table' | 'result';
+  title: string;
+  subtitle?: string;
+  ok?: boolean;
+  fields?: PanelField[];
+  columns?: string[];
+  rows?: string[][];
+  text?: string;
+}
+
 /** Events streamed from the agent loop (main) to the console (renderer). */
 export type AgentStreamEvent =
   | { type: 'status'; runId: string; text: string }
   | { type: 'assistant'; runId: string; text: string }
   | { type: 'tool_start'; runId: string; id: string; tool: ToolName; title: string; command: string }
   | { type: 'tool_end'; runId: string; id: string; ok: boolean; preview: string; isDiff?: boolean }
+  | { type: 'panel'; runId: string; panel: PanelData }
   | { type: 'done'; runId: string }
   | { type: 'error'; runId: string; message: string };
 

@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.7', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.8', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -91,6 +91,7 @@ export function createPreviewApi(): MaxDesktopApi {
       emit({ type: 'tool_start', runId, id: 't4', tool: 'onar_action', title: 'OnarSuite', command: 'create_user' });
       await wait(800);
       emit({ type: 'tool_end', runId, id: 't4', ok: true, preview: "create_user · Utente 'Ferdinando Franzese' creato. Password temporanea: 7Kf9pQ2xL4mZ" });
+      emit({ type: 'panel', runId, panel: { kind: 'customer', title: 'Ferdinando Franzese', subtitle: 'Utente creato. Password temporanea: 7Kf9pQ2xL4mZ', ok: true, fields: [{ label: 'Email', value: 'fra@example.com' }, { label: 'Ruolo (ID)', value: '126' }] } });
       emit({ type: 'assistant', runId, text: `Fatto ✅\n\n- Letto il contratto e aggiornata l'intestazione\n- Creato l'utente Ferdinando Franzese in OnarSuite (ruolo Cliente)\n\nLa password temporanea è nel risultato qui sopra.` });
       emit({ type: 'done', runId });
       void input;

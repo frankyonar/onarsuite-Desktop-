@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentMessage, AgentStreamEvent, ToolName } from '../../shared/types';
+import type { AgentMessage, AgentStreamEvent, PanelData, PanelField, ToolName } from '../../shared/types';
 import type { AuditLog } from './audit-log';
 import type { AgentSdk } from './agent-sdk';
 import type { AgentTools } from './tools';
@@ -103,6 +103,8 @@ export class AgentEngine {
           }
 
           emit({ type: 'tool_end', runId, id: call.id, ok: result.ok, preview: result.preview, isDiff: result.isDiff });
+          const panel = buildPanel(call.function.name, args, result);
+          if (panel) emit({ type: 'panel', runId, panel });
           this.messages.push({ role: 'tool', tool_call_id: call.id, name: call.function.name, content: result.content });
         }
       }
@@ -140,4 +142,35 @@ function describe(tool: ToolName, args: Record<string, unknown>): { title: strin
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : 'Errore imprevisto.';
+}
+
+/** Turn a tool result into a structured right-panel preview (only the cases
+ *  worth a panel: a file Max read, or an object it created/touched in OnarSuite). */
+function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: boolean; content: string }): PanelData | null {
+  const str = (v: unknown) => (v === undefined || v === null ? '' : String(v));
+
+  if (tool === 'read_file') {
+    const p = str(args.path);
+    return { kind: 'file', title: p.split(/[\\/]/).pop() || p, subtitle: p, text: result.content.slice(0, 6000), ok: result.ok };
+  }
+
+  if (tool === 'onar_action') {
+    const action = str(args.action_type);
+    const data = (args.data ?? {}) as Record<string, unknown>;
+    if (/customer|lead|user/.test(action)) {
+      const fields: PanelField[] = [];
+      if (data.email) fields.push({ label: 'Email', value: str(data.email) });
+      if (data.phone || data.mobile_no) fields.push({ label: 'Telefono', value: str(data.phone ?? data.mobile_no) });
+      if (data.role_id) fields.push({ label: 'Ruolo (ID)', value: str(data.role_id) });
+      return { kind: 'customer', title: str(data.name) || 'Cliente', subtitle: result.content, ok: result.ok, fields };
+    }
+    if (/contract/.test(action)) {
+      const fields: PanelField[] = [];
+      if (data.amount) fields.push({ label: 'Importo', value: `${str(data.amount)} EUR` });
+      return { kind: 'contract', title: str(data.title) || 'Contratto', subtitle: result.content, ok: result.ok, fields, text: str(data.description) };
+    }
+    return { kind: 'result', title: action || 'OnarSuite', text: result.content, ok: result.ok };
+  }
+
+  return null;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
-import type { AgentStreamEvent, AppSnapshot, AuditEntry, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, UpdateState } from '../../shared/types';
+import type { AgentStreamEvent, AppSnapshot, AuditEntry, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import { BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard, Wordmark } from './components';
 
@@ -258,12 +258,14 @@ function AgentConsole({ convId, initialItems, onPersist, selected, onSelectFile,
   const [status, setStatus] = useState<string>();
   const [running, setRunning] = useState(false);
   const [text, setText] = useState('');
+  const [panel, setPanel] = useState<PanelData>();
   const streamRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const unsubscribe = window.maxDesktop.onAgentEvent((event: AgentStreamEvent) => {
       setItems((prev) => reduceEvent(prev, event));
       if (event.type === 'status') setStatus(event.text);
+      if (event.type === 'panel') setPanel(event.panel);
       if (event.type === 'done' || event.type === 'error') { setRunning(false); setStatus(undefined); }
     });
     return unsubscribe;
@@ -315,7 +317,8 @@ function AgentConsole({ convId, initialItems, onPersist, selected, onSelectFile,
     </div>
   </form>;
 
-  return <div className={`console ${empty ? 'is-empty' : ''}`}>
+  return <div className="agent-layout">
+    <div className={`console ${empty ? 'is-empty' : ''}`}>
     {empty
       ? <div className="console-hero">
           <BrandMark size={46} />
@@ -332,8 +335,31 @@ function AgentConsole({ convId, initialItems, onPersist, selected, onSelectFile,
           </div>
           {composer}
         </>}
+    </div>
+    {panel && <SidePanel panel={panel} onClose={() => setPanel(undefined)} />}
   </div>;
 }
+
+function SidePanel({ panel, onClose }: { panel: PanelData; onClose: () => void }) {
+  return <aside className="side-panel">
+    <header className="side-panel-head">
+      <span className="side-panel-kind">{PANEL_LABELS[panel.kind]}</span>
+      <button onClick={onClose} title="Chiudi">×</button>
+    </header>
+    <div className="side-panel-body">
+      <div className="side-panel-title">
+        <strong>{panel.title}</strong>
+        {panel.ok !== undefined && <span className={`pill ${panel.ok ? 'ok' : 'err'}`}>{panel.ok ? '✓' : '✗'}</span>}
+      </div>
+      {panel.subtitle && <p className="side-panel-sub">{panel.subtitle}</p>}
+      {panel.fields && panel.fields.length > 0 && <dl className="side-panel-fields">{panel.fields.map((f) => <div key={f.label}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>}
+      {panel.columns && panel.rows && <div className="side-panel-table"><div className="data-row head" style={{ gridTemplateColumns: panel.columns.map(() => 'minmax(0,1fr)').join(' ') }}>{panel.columns.map((c) => <span key={c}>{c}</span>)}</div>{panel.rows.map((row, i) => <div className="data-row" key={i} style={{ gridTemplateColumns: panel.columns!.map(() => 'minmax(0,1fr)').join(' ') }}>{row.map((cell, j) => <span key={j} title={cell}>{cell}</span>)}</div>)}</div>}
+      {panel.text && (panel.kind === 'file' ? <pre className="side-panel-text">{panel.text}</pre> : <p className="side-panel-text">{panel.text}</p>)}
+    </div>
+  </aside>;
+}
+
+const PANEL_LABELS: Record<PanelData['kind'], string> = { customer: 'Cliente', contract: 'Contratto', file: 'File', table: 'Tabella', result: 'Risultato' };
 
 function greeting(name?: string): string {
   const h = new Date().getHours();
