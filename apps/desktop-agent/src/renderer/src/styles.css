@@ -330,6 +330,20 @@ h1, h2, h3, .brand strong { font-family: var(--font-display); font-weight: 600; 
 .new-chat > span { font-size: 16px; color: var(--brand-ink); }
 .nav-divider { margin: 14px 6px 6px; color: var(--faint); font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
 
+/* ---- Conversation history (recents + search) ---- */
+.conv-section { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 12px; }
+.conv-search input { width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 7px 11px; background: var(--glass-strong); outline: none; color: var(--ink); font-size: 12px; }
+.conv-search input:focus { border-color: var(--ring); }
+.conv-list { flex: 1; min-height: 60px; overflow-y: auto; margin: 8px -4px 0; display: flex; flex-direction: column; gap: 1px; }
+.conv-item { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--muted); cursor: pointer; transition: background .12s, color .12s; }
+.conv-item:hover { background: var(--hover); color: var(--ink); }
+.conv-item.active { background: var(--brand-soft); color: var(--brand-ink); }
+.conv-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.conv-del { flex: 0 0 auto; border: 0; background: transparent; color: var(--faint); font-size: 15px; line-height: 1; opacity: 0; cursor: pointer; }
+.conv-item:hover .conv-del { opacity: 1; }
+.conv-del:hover { color: var(--err); }
+.conv-empty { margin: 12px 6px; color: var(--faint); font-size: 11px; line-height: 1.5; }
+
 /* ---- Light suggestion pills (not cards) ---- */
 .prompt-pills { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 6px; }
 .prompt-pills button { border: 1px solid var(--border); border-radius: 99px; padding: 8px 15px; background: transparent; color: var(--ink); font-size: 12.5px; transition: border-color .12s, background .12s; }

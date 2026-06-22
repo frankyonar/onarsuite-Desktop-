@@ -75,6 +75,12 @@ function registerIpc(): void {
     runtime.runAgent(input, (streamEvent) => event.sender.send('agent:event', streamEvent)));
   ipcMain.handle('agent:cancel', () => runtime.cancelAgent());
   ipcMain.handle('agent:reset', () => runtime.resetAgent());
+  ipcMain.handle('conv:list', () => runtime.listConversations());
+  ipcMain.handle('conv:get', (_event, id: string) => runtime.getConversation(id));
+  ipcMain.handle('conv:save', (_event, input) => runtime.saveConversation(input));
+  ipcMain.handle('conv:new', () => runtime.newConversation());
+  ipcMain.handle('conv:select', (_event, id: string) => runtime.selectConversation(id));
+  ipcMain.handle('conv:delete', (_event, id: string) => runtime.deleteConversation(id));
   ipcMain.handle('fs:explore', (_event, dirPath?: string) => runtime.explore(dirPath));
   ipcMain.handle('fs:read', (_event, filePath: string) => runtime.readFileText(filePath));
   ipcMain.handle('fs:write', (_event, filePath: string, text: string) => runtime.writeFileText(filePath, text));

@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
-import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, FsEntry, LocalFile, PairingInput, ToolName, UpdateState } from '../../shared/types';
+import type { AgentStreamEvent, AppSnapshot, AuditEntry, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import { BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard, Wordmark } from './components';
 
 type View = 'onarsuite' | 'clients' | 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
 type Theme = 'light' | 'dark';
-
-type ConsoleItem =
-  | { kind: 'user'; id: string; text: string }
-  | { kind: 'assistant'; id: string; text: string }
-  | { kind: 'tool'; id: string; tool: ToolName; title: string; command: string; status: 'running' | 'done' | 'error'; preview?: string; isDiff?: boolean };
 
 function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -42,12 +37,38 @@ export function App() {
   const [startupError, setStartupError] = useState<string>();
   const [view, setView] = useState<View>('agent');
   const [chatKey, setChatKey] = useState(0);
+  const [conversations, setConversations] = useState<ConversationMeta[]>([]);
+  const [activeConv, setActiveConv] = useState<{ id: string; items: ConsoleItem[] }>();
+  const [convSearch, setConvSearch] = useState('');
 
-  const newChat = useCallback(() => {
-    void window.maxDesktop.resetAgent().catch(() => undefined);
+  const loadConversations = useCallback(async () => {
+    setConversations(await window.maxDesktop.listConversations().catch(() => []));
+  }, []);
+
+  const newChat = useCallback(async () => {
+    const conv = await window.maxDesktop.newConversation();
+    setActiveConv({ id: conv.id, items: [] });
     setChatKey((k) => k + 1);
     setView('agent');
   }, []);
+
+  const openConversation = useCallback(async (id: string) => {
+    const conv = await window.maxDesktop.getConversation(id);
+    if (!conv) return;
+    await window.maxDesktop.selectConversation(id);
+    setActiveConv({ id: conv.id, items: conv.items });
+    setChatKey((k) => k + 1);
+    setView('agent');
+  }, []);
+
+  const persistConversation = useCallback(async (id: string, items: ConsoleItem[]) => {
+    setConversations(await window.maxDesktop.saveConversation({ id, items }));
+  }, []);
+
+  const removeConversation = useCallback(async (id: string) => {
+    setConversations(await window.maxDesktop.deleteConversation(id));
+    if (activeConv?.id === id) await newChat();
+  }, [activeConv, newChat]);
   const [files, setFiles] = useState<LocalFile[]>([]);
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [selected, setSelected] = useState<LocalFile>();
@@ -89,6 +110,13 @@ export function App() {
     return () => window.clearInterval(timer);
   }, [refresh]);
   useEffect(() => window.maxDesktop.onAuthChanged(() => void refresh().catch(() => undefined)), [refresh]);
+  useEffect(() => {
+    void (async () => {
+      await loadConversations();
+      const conv = await window.maxDesktop.newConversation().catch(() => undefined);
+      if (conv) setActiveConv({ id: conv.id, items: [] });
+    })();
+  }, [loadConversations]);
   useEffect(() => {
     let active = true;
     void window.maxDesktop.getUpdateState()
@@ -139,8 +167,20 @@ export function App() {
   return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)` }}>
     <aside className="sidebar">
       <div className="brand"><BrandMark size={34} /><div><Wordmark /><span>Agente Max AI</span></div></div>
-      <button className="new-chat" onClick={newChat}><span>＋</span>Nuova chat</button>
+      <button className="new-chat" onClick={() => void newChat()}><span>＋</span>Nuova chat</button>
       <nav>{navItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}</nav>
+      <div className="conv-section">
+        <div className="conv-search"><input value={convSearch} onChange={(e) => setConvSearch(e.target.value)} placeholder="Cerca chat…" /></div>
+        <div className="conv-list">
+          {conversations.filter((c) => c.title.toLowerCase().includes(convSearch.toLowerCase())).map((c) => (
+            <div key={c.id} className={`conv-item ${activeConv?.id === c.id ? 'active' : ''}`} onClick={() => void openConversation(c.id)}>
+              <span className="conv-title">{c.title}</span>
+              <button className="conv-del" title="Elimina" onClick={(e) => { e.stopPropagation(); void removeConversation(c.id); }}>×</button>
+            </div>
+          ))}
+          {conversations.length === 0 && <p className="conv-empty">Le tue chat appariranno qui.</p>}
+        </div>
+      </div>
       <div className="nav-divider">Strumenti</div>
       <nav>{toolItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}
         <button className={view === 'settings' ? 'active' : ''} onClick={() => setView('settings')}><span>⚙</span>Impostazioni</button>
@@ -161,7 +201,7 @@ export function App() {
       {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
       {view === 'onarsuite' && <OnarHome onNotice={setNotice} onGoClients={() => setView('clients')} />}
       {view === 'clients' && <ClientsView />}
-      {view === 'agent' && <AgentConsole key={chatKey} selected={selected} onSelectFile={setSelected} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
+      {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} onPersist={(items) => void persistConversation(activeConv.id, items)} selected={selected} onSelectFile={setSelected} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
       {view === 'dashboard' && <Dashboard snapshot={snapshot} files={files} logs={logs} onGoAgent={() => setView('agent')} onSync={() => run(() => window.maxDesktop.syncNow())} />}
       {view === 'folders' && <FoldersView snapshot={snapshot} busy={busy} onAdd={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemove={(folder) => run(() => window.maxDesktop.removeAuthorizedFolder(folder))} onDrop={importDrop} onChoose={() => run(() => window.maxDesktop.chooseFiles(), 'File aggiunti alla workspace.')} />}
@@ -213,8 +253,8 @@ const SUGGESTIONS = [
   'Mostrami le attività di oggi',
 ];
 
-function AgentConsole({ selected, onSelectFile, onAfterRun, accountLabel }: { selected?: LocalFile; onSelectFile: (file?: LocalFile) => void; onAfterRun: () => void; accountLabel?: string }) {
-  const [items, setItems] = useState<ConsoleItem[]>([]);
+function AgentConsole({ convId, initialItems, onPersist, selected, onSelectFile, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; selected?: LocalFile; onSelectFile: (file?: LocalFile) => void; onAfterRun: () => void; accountLabel?: string }) {
+  const [items, setItems] = useState<ConsoleItem[]>(initialItems);
   const [status, setStatus] = useState<string>();
   const [running, setRunning] = useState(false);
   const [text, setText] = useState('');
@@ -230,6 +270,12 @@ function AgentConsole({ selected, onSelectFile, onAfterRun, accountLabel }: { se
   }, []);
 
   useEffect(() => { streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: 'smooth' }); }, [items, status]);
+
+  // Persist the transcript once a turn settles (history survives restarts).
+  useEffect(() => {
+    if (items.length > 0 && !running) onPersist(items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, running, convId]);
 
   const send = async (value: string) => {
     const message = value.trim();

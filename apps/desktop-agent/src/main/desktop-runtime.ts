@@ -2,11 +2,12 @@ import { dialog, safeStorage, shell } from 'electron';
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type FileAction, type FileContent, type FsEntry, type LocalFile, type PairingInput } from '../shared/types';
+import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type ConsoleItem, type Conversation, type ConversationMeta, type FileAction, type FileContent, type FsEntry, type LocalFile, type PairingInput } from '../shared/types';
 import { isAllowedPath } from '../shared/path-policy';
 import { AgentSdk, NetworkError, RevokedDeviceError } from './services/agent-sdk';
 import { AgentEngine } from './services/agent-engine';
 import { AgentTools } from './services/tools';
+import { ConversationStore } from './services/conversation-store';
 import { AuditLog } from './services/audit-log';
 import { ConfigStore } from './services/config-store';
 import { isSupportedFile, parseDocument } from './services/document-parser';
@@ -38,6 +39,8 @@ export class DesktopRuntime {
     (actionType, data) => this.sdk.onarExecute(actionType, data),
   );
   readonly engine = new AgentEngine(this.sdk, this.tools, this.audit);
+  readonly conversations = new ConversationStore(this.config.dataDirectory);
+  private activeConvId?: string;
   private connection: AppSnapshot['connection'] = 'not_paired';
   private readonly queuePath = path.join(this.config.dataDirectory, 'queue.json');
   private syncInProgress = false;
@@ -289,6 +292,7 @@ export class DesktopRuntime {
 
   async clearLocalData(): Promise<AppSnapshot> {
     await this.audit.clear();
+    await this.conversations.clear();
     await rm(this.queuePath, { force: true });
     await this.config.clearAll();
     this.connection = 'not_paired';
@@ -353,6 +357,44 @@ export class DesktopRuntime {
 
   resetAgent(): void {
     this.engine.reset();
+  }
+
+  // --- Conversation history ---
+
+  listConversations(): Promise<ConversationMeta[]> {
+    return this.conversations.list();
+  }
+
+  getConversation(id: string): Promise<Conversation | null> {
+    return this.conversations.get(id);
+  }
+
+  /** Open a saved conversation: restore its LLM context into the engine. */
+  async selectConversation(id: string): Promise<void> {
+    this.activeConvId = id;
+    this.engine.load(await this.conversations.getMessages(id));
+  }
+
+  /** Start a fresh chat (not persisted until the first message). */
+  async newConversation(): Promise<Conversation> {
+    const id = this.conversations.newId();
+    this.activeConvId = id;
+    this.engine.reset();
+    const now = new Date().toISOString();
+    return { id, title: 'Nuova chat', createdAt: now, updatedAt: now, items: [] };
+  }
+
+  /** Persist the active chat's transcript + the current LLM context. */
+  saveConversation(input: { id: string; title?: string; items: ConsoleItem[] }): Promise<ConversationMeta[]> {
+    this.activeConvId = input.id;
+    const title = (input.title && input.title.trim()) || deriveTitle(input.items);
+    return this.conversations.save(input.id, title, input.items, this.engine.getMessages());
+  }
+
+  async deleteConversation(id: string): Promise<ConversationMeta[]> {
+    const list = await this.conversations.remove(id);
+    if (this.activeConvId === id) { this.activeConvId = undefined; this.engine.reset(); }
+    return list;
   }
 
   /** Explorer: list a directory, or the authorized roots when no path is given. */
@@ -438,6 +480,13 @@ async function toLocalFile(filePath: string, source: LocalFile['source']): Promi
     modifiedAt: details.mtime.toISOString(),
     source,
   };
+}
+
+function deriveTitle(items: ConsoleItem[]): string {
+  const firstUser = items.find((i) => i.kind === 'user') as { text?: string } | undefined;
+  const clean = (firstUser?.text ?? '').replace(/\s+/g, ' ').trim();
+  if (!clean) return 'Nuova chat';
+  return clean.length > 48 ? `${clean.slice(0, 48)}…` : clean;
 }
 
 async function toFsEntry(fullPath: string, kind: FsEntry['kind']): Promise<FsEntry> {

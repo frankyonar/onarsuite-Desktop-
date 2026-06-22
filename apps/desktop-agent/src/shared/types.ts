@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.6';
+export const APP_VERSION = '0.9.7';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -73,6 +73,24 @@ export interface AgentRunInput {
   /** Prior plain chat turns shown in the console, for continuity. */
   history: ChatMessage[];
   filePath?: string;
+}
+
+/** One rendered item in the chat transcript (UI). */
+export type ConsoleItem =
+  | { kind: 'user'; id: string; text: string }
+  | { kind: 'assistant'; id: string; text: string }
+  | { kind: 'tool'; id: string; tool: ToolName; title: string; command: string; status: 'running' | 'done' | 'error'; preview?: string; isDiff?: boolean };
+
+/** A saved conversation (history). */
+export interface ConversationMeta {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
+export interface Conversation extends ConversationMeta {
+  createdAt: string;
+  items: ConsoleItem[];
 }
 
 export interface PairingInput {
@@ -196,6 +214,13 @@ export interface MaxDesktopApi {
   runAgent(input: AgentRunInput): Promise<void>;
   cancelAgent(): Promise<void>;
   resetAgent(): Promise<void>;
+  // --- Conversation history ---
+  listConversations(): Promise<ConversationMeta[]>;
+  getConversation(id: string): Promise<Conversation | null>;
+  saveConversation(input: { id: string; title?: string; items: ConsoleItem[] }): Promise<ConversationMeta[]>;
+  newConversation(): Promise<Conversation>;
+  selectConversation(id: string): Promise<void>;
+  deleteConversation(id: string): Promise<ConversationMeta[]>;
   onAgentEvent(callback: (event: AgentStreamEvent) => void): () => void;
   // --- File explorer / editor ---
   explore(dirPath?: string): Promise<FsEntry[]>;

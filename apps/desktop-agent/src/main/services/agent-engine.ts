@@ -42,6 +42,16 @@ export class AgentEngine {
     this.messages = [];
   }
 
+  /** Load a saved conversation's LLM context (for continuity after switching). */
+  load(messages: AgentMessage[]): void {
+    this.messages = Array.isArray(messages) ? [...messages] : [];
+  }
+
+  /** Snapshot the current LLM context to persist with the conversation. */
+  getMessages(): AgentMessage[] {
+    return [...this.messages];
+  }
+
   cancel(): void {
     if (this.running) this.canceled = true;
   }

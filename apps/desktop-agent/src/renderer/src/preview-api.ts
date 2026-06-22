@@ -1,7 +1,9 @@
-import type { AgentStreamEvent, AppSnapshot, AuditEntry, FsEntry, LocalFile, MaxDesktopApi, UpdateState } from '../../shared/types';
+import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, LocalFile, MaxDesktopApi, UpdateState } from '../../shared/types';
+
+let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.6', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.7', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -95,6 +97,18 @@ export function createPreviewApi(): MaxDesktopApi {
     },
     cancelAgent: async () => { canceled = true; },
     resetAgent: async () => undefined,
+    listConversations: async () => convs.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt })),
+    getConversation: async (id) => convs.find((c) => c.id === id) ?? null,
+    saveConversation: async (input) => {
+      const now = new Date().toISOString();
+      const ex = convs.find((c) => c.id === input.id);
+      if (ex) { ex.items = input.items as never[]; ex.updatedAt = now; if (input.title) ex.title = input.title; }
+      else convs.unshift({ id: input.id, title: input.title || 'Nuova chat', createdAt: now, updatedAt: now, items: input.items as never[] });
+      return convs.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt }));
+    },
+    newConversation: async () => ({ id: crypto.randomUUID(), title: 'Nuova chat', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), items: [] }),
+    selectConversation: async () => undefined,
+    deleteConversation: async (id) => { convs = convs.filter((c) => c.id !== id); return convs.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt })); },
     onAgentEvent: (callback) => { listeners.add(callback); return () => listeners.delete(callback); },
     explore: async (dirPath) => tree[dirPath ?? ''] ?? [],
     readFileText: async (filePath) => ({ path: filePath, text: fileText[filePath] ?? '// File non disponibile in anteprima.', truncated: false }),
