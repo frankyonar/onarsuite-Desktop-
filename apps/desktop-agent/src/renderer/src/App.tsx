@@ -161,7 +161,7 @@ export function App() {
       {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
       {view === 'onarsuite' && <OnarHome onNotice={setNotice} onGoClients={() => setView('clients')} />}
       {view === 'clients' && <ClientsView />}
-      {view === 'agent' && <AgentConsole key={chatKey} files={files} selected={selected} onSelectFile={setSelected} onAfterRun={() => void refresh()} />}
+      {view === 'agent' && <AgentConsole key={chatKey} selected={selected} onSelectFile={setSelected} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
       {view === 'dashboard' && <Dashboard snapshot={snapshot} files={files} logs={logs} onGoAgent={() => setView('agent')} onSync={() => run(() => window.maxDesktop.syncNow())} />}
       {view === 'folders' && <FoldersView snapshot={snapshot} busy={busy} onAdd={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemove={(folder) => run(() => window.maxDesktop.removeAuthorizedFolder(folder))} onDrop={importDrop} onChoose={() => run(() => window.maxDesktop.chooseFiles(), 'File aggiunti alla workspace.')} />}
@@ -213,7 +213,7 @@ const SUGGESTIONS = [
   'Mostrami le attività di oggi',
 ];
 
-function AgentConsole({ files, selected, onSelectFile, onAfterRun }: { files: LocalFile[]; selected?: LocalFile; onSelectFile: (file?: LocalFile) => void; onAfterRun: () => void }) {
+function AgentConsole({ selected, onSelectFile, onAfterRun, accountLabel }: { selected?: LocalFile; onSelectFile: (file?: LocalFile) => void; onAfterRun: () => void; accountLabel?: string }) {
   const [items, setItems] = useState<ConsoleItem[]>([]);
   const [status, setStatus] = useState<string>();
   const [running, setRunning] = useState(false);
@@ -245,40 +245,61 @@ function AgentConsole({ files, selected, onSelectFile, onAfterRun }: { files: Lo
   const stop = () => { void window.maxDesktop.cancelAgent(); };
   const submit = (event: FormEvent) => { event.preventDefault(); void send(text); };
 
-  return <div className="console">
-    <div className="console-stream" ref={streamRef}>
-      {items.length === 0 && !running ? <div className="chat-welcome">
-        <BrandMark size={60} />
-        <h2>Ciao, sono Max</h2>
-        <p>Posso aiutarti a lavorare su OnarSuite e sui file di questo computer. Chiedimi di creare clienti, preventivi, fatture, contratti, cercare documenti o collegare file locali.</p>
-        <div className="prompt-pills">{SUGGESTIONS.map((prompt) => <button key={prompt} onClick={() => void send(prompt)}>{prompt}</button>)}</div>
-      </div> : items.map((item) => <ConsoleRow key={item.id} item={item} />)}
-      {running && <div className="agent-indicator"><span className="dots"><i /><i /><i /></span>{status || 'Max sta lavorando…'}</div>}
+  const grow = (el: HTMLTextAreaElement) => { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 220)}px`; };
+  const attach = async () => {
+    const picked = await window.maxDesktop.chooseFiles();
+    if (picked && picked[0]) onSelectFile(picked[0]);
+    onAfterRun();
+  };
+
+  const empty = items.length === 0 && !running;
+
+  const composer = <form className="composer" onSubmit={submit}>
+    {selected && <div className="composer-context"><span>◌ {selected.name}</span><button type="button" onClick={() => onSelectFile(undefined)} title="Rimuovi contesto">×</button></div>}
+    <textarea value={text} rows={1}
+      onChange={(event) => { setText(event.target.value); grow(event.target); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(e); } }}
+      placeholder="Scrivi a Max…" />
+    <div className="composer-toolbar">
+      <button type="button" className="composer-attach" onClick={() => void attach()} title="Allega un file">＋</button>
+      <span className="composer-mode" title="Max agisce in autonomia; ogni azione è registrata">Autonomo</span>
+      {running
+        ? <button type="button" className="composer-send stop" onClick={stop} title="Ferma">■</button>
+        : <button type="submit" className="composer-send" disabled={!text.trim()} title="Invia">↑</button>}
     </div>
-    <form className="composer" onSubmit={submit}>
-      <div className="composer-meta">
-        <div className="context-picker">
-          <span>Contesto</span>
-          <select value={selected?.path || ''} onChange={(event) => onSelectFile(files.find((file) => file.path === event.target.value))}>
-            <option value="">Nessun documento</option>
-            {files.map((file) => <option key={file.id} value={file.path}>{file.name}</option>)}
-          </select>
+  </form>;
+
+  return <div className={`console ${empty ? 'is-empty' : ''}`}>
+    {empty
+      ? <div className="console-hero">
+          <BrandMark size={46} />
+          <h2 className="greeting">{greeting(accountLabel)}</h2>
+          {composer}
+          <div className="prompt-pills">{SUGGESTIONS.map((prompt) => <button key={prompt} onClick={() => void send(prompt)}>{prompt}</button>)}</div>
         </div>
-        <span className="autonomous-pill" title="Max agisce senza chiedere conferma; ogni azione è nell’audit log">● Modalità autonoma</span>
-      </div>
-      <div className="composer-row">
-        <textarea value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(e); } }} placeholder="Chiedi a Max di fare qualcosa…  (Invio per inviare · Shift+Invio per andare a capo)" rows={3} />
-        {running ? <Button variant="danger" type="button" onClick={stop}>Ferma</Button> : <Button type="submit" disabled={!text.trim()}>Invia ↑</Button>}
-      </div>
-      <small>Max opera solo nelle cartelle autorizzate. Comandi shell e modifiche ai file sono registrati nell’audit log.</small>
-    </form>
+      : <>
+          <div className="console-stream" ref={streamRef}>
+            <div className="console-thread">
+              {items.map((item) => <ConsoleRow key={item.id} item={item} />)}
+              {running && <div className="agent-indicator"><span className="dots"><i /><i /><i /></span>{status || 'Max sta lavorando…'}</div>}
+            </div>
+          </div>
+          {composer}
+        </>}
   </div>;
 }
 
+function greeting(name?: string): string {
+  const h = new Date().getHours();
+  const part = h < 12 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera';
+  const who = name ? `, ${name.split(' ')[0]}` : '';
+  return `${part}${who}`;
+}
+
 function ConsoleRow({ item }: { item: ConsoleItem }) {
-  if (item.kind === 'tool') return <ToolCard tool={item.tool} title={item.title} command={item.command} status={item.status} preview={item.preview} isDiff={item.isDiff} />;
-  if (item.kind === 'user') return <div className="msg user"><div className="msg-avatar">Tu</div><div className="msg-body"><p>{item.text}</p></div></div>;
-  return <div className="msg assistant"><div className="msg-avatar">M</div><div className="msg-body"><Markdown content={item.text} /></div></div>;
+  if (item.kind === 'tool') return <div className="turn turn-tool"><ToolCard tool={item.tool} title={item.title} command={item.command} status={item.status} preview={item.preview} isDiff={item.isDiff} /></div>;
+  if (item.kind === 'user') return <div className="turn turn-user"><div className="bubble">{item.text}</div></div>;
+  return <div className="turn turn-assistant"><Markdown content={item.text} /></div>;
 }
 
 function reduceEvent(prev: ConsoleItem[], event: AgentStreamEvent): ConsoleItem[] {

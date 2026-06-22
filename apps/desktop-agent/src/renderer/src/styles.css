@@ -261,13 +261,20 @@ h1, h2, h3, .brand strong { font-family: var(--font-display); font-weight: 600; 
 .chat-message.user .chat-avatar { color: var(--ink); background: var(--hover); }
 .chat-message strong { font-size: 12px; font-weight: 600; }
 .chat-message p { margin: 7px 0 0; color: var(--ink); opacity: .92; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
-.composer { border-top: 1px solid var(--border-soft); border-left: 0; border-right: 0; border-bottom: 0; padding: 14px 18px 13px; }
-.context-picker { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: var(--muted); font-size: 10px; }
-.context-picker select { max-width: 320px; border: 0; color: var(--brand-ink); background: transparent; font: 500 10px/1.2 var(--font-ui); }
-.composer-row { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; }
-.composer textarea { width: 100%; resize: none; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; outline: none; background: var(--glass-strong); font: 13px/1.5 var(--font-ui); }
-.composer textarea:focus { border-color: var(--ring); box-shadow: 0 0 0 3px rgba(59,130,246,.18); }
-.composer > small { display: block; margin-top: 7px; color: var(--faint); font-size: 9px; }
+/* ---- Claude-Desktop-style composer (rounded box, attach + send) ---- */
+.composer { width: 100%; max-width: 768px; margin: 6px auto 14px; padding: 8px 10px 10px; border: 1px solid var(--border); border-radius: 24px; background: var(--glass-strong); box-shadow: var(--glass-shadow); }
+.composer:focus-within { border-color: var(--ring); }
+.composer textarea { display: block; width: 100%; resize: none; border: 0; outline: none; background: transparent; padding: 6px 8px 0; font: 14px/1.55 var(--font-ui); color: var(--ink); max-height: 220px; }
+.composer textarea::placeholder { color: var(--faint); }
+.composer-toolbar { display: flex; align-items: center; gap: 9px; padding: 4px 4px 0; }
+.composer-attach { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font-size: 17px; transition: background .12s, color .12s; }
+.composer-attach:hover { background: var(--hover); color: var(--ink); }
+.composer-mode { color: var(--faint); font-size: 11px; }
+.composer-send { width: 32px; height: 32px; margin-left: auto; flex: 0 0 auto; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--brand); color: #fff; font-size: 16px; font-weight: 700; transition: opacity .12s, background .12s; }
+.composer-send:disabled { background: var(--border); color: var(--faint); }
+.composer-send.stop { background: var(--err); font-size: 11px; }
+.composer-context { display: inline-flex; align-items: center; gap: 8px; margin: 2px 4px 8px; padding: 5px 11px; border-radius: 99px; background: var(--hover); color: var(--muted); font-size: 11px; }
+.composer-context button { border: 0; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; }
 
 /* ---- Markdown / code rendering in chat ---- */
 .markdown { margin-top: 7px; color: var(--ink); opacity: .96; font-size: 13px; line-height: 1.7; }
@@ -328,17 +335,19 @@ h1, h2, h3, .brand strong { font-family: var(--font-display); font-weight: 600; 
 .prompt-pills button { border: 1px solid var(--border); border-radius: 99px; padding: 8px 15px; background: transparent; color: var(--ink); font-size: 12.5px; transition: border-color .12s, background .12s; }
 .prompt-pills button:hover { border-color: var(--brand); background: var(--brand-tint); color: var(--brand-ink); }
 
-/* ---- Agent console (Claude-Code-style transcript) ---- */
-.console { min-height: calc(100vh - 132px); display: grid; grid-template-rows: 1fr auto; overflow: hidden; border-radius: var(--radius); }
-.console-stream { min-height: 420px; max-height: calc(100vh - 250px); overflow-y: auto; padding: 28px clamp(18px, 5vw, 64px); display: flex; flex-direction: column; gap: 14px; }
-.console-stream > * { width: 100%; max-width: 860px; margin-inline: auto; }
-.msg { display: grid; grid-template-columns: 36px 1fr; gap: 13px; }
-.msg-avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; color: #fff; background: linear-gradient(150deg, #3b82f6, #1d4ed8); font-size: 11px; font-weight: 600; }
-.msg.user .msg-avatar { color: var(--ink); background: var(--hover); }
-.msg-body { min-width: 0; }
-.msg.user .msg-body { padding: 9px 14px; border-radius: 14px; background: var(--glass-strong); border: 1px solid var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-sheen); }
-.msg-body > p { margin: 0; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
-.msg.assistant .msg-body > p { margin-top: 6px; }
+/* ---- Claude-Desktop-style chat (centered column, bubbles + prose) ---- */
+.console { height: calc(100vh - 150px); display: flex; flex-direction: column; background: transparent; border: 0; box-shadow: none; border-radius: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.console.is-empty { justify-content: center; align-items: center; }
+.console-hero { width: 100%; max-width: 768px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 0 16px; }
+.greeting { margin: 0; font-size: 28px; font-weight: 500; letter-spacing: var(--tracking-tight); text-align: center; }
+.console-hero .composer { width: 100%; margin: 4px 0 0; }
+.console-stream { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 16px 6px; }
+.console-thread { max-width: 768px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+.turn { width: 100%; }
+.turn-user { display: flex; justify-content: flex-end; }
+.turn-user .bubble { max-width: 80%; padding: 10px 15px; border-radius: 18px; background: var(--brand-soft); color: var(--ink); font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.turn-assistant { font-size: 14px; line-height: 1.7; }
+.turn-assistant .markdown { margin-top: 0; font-size: 14px; line-height: 1.7; }
 
 .tool-card { border-radius: 13px; }
 .tool-card-head { display: flex; align-items: center; gap: 11px; padding: 11px 14px; }
@@ -361,7 +370,7 @@ h1, h2, h3, .brand strong { font-family: var(--font-display); font-weight: 600; 
 .tool-result pre.diff { white-space: pre; }
 .diff-add { color: var(--ok); } .diff-del { color: var(--err); }
 
-.agent-indicator { display: flex; align-items: center; gap: 10px; padding-left: 49px; color: var(--muted); font-size: 12px; }
+.agent-indicator { display: flex; align-items: center; gap: 10px; padding-left: 2px; color: var(--muted); font-size: 13px; }
 .dots { display: inline-flex; gap: 4px; }
 .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); animation: bounce 1.2s infinite ease-in-out; }
 .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
