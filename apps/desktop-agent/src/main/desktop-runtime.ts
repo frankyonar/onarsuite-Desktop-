@@ -339,10 +339,15 @@ export class DesktopRuntime {
     }
 
     let fileContext: string | undefined;
-    if (input.filePath) {
-      await this.assertAuthorized(input.filePath);
-      const parsed = await parseDocument(input.filePath);
-      fileContext = `${path.basename(input.filePath)}:\n${parsed.text.slice(0, 50_000)}`;
+    const filePaths = Array.from(new Set(input.filePaths ?? [])).filter(Boolean);
+    if (filePaths.length) {
+      const parts: string[] = [];
+      for (const filePath of filePaths) {
+        await this.assertAuthorized(filePath);
+        const parsed = await parseDocument(filePath);
+        parts.push(`${path.basename(filePath)}:\n${parsed.text.slice(0, 50_000)}`);
+      }
+      fileContext = parts.join('\n\n---\n\n');
     }
 
     await this.audit.write('agent_run_started', 'info', 'Avvio run agente Max', { hasFileContext: Boolean(fileContext) });

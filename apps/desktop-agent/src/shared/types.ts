@@ -86,7 +86,7 @@ export interface AgentRunInput {
   message: string;
   /** Prior plain chat turns shown in the console, for continuity. */
   history: ChatMessage[];
-  filePath?: string;
+  filePaths?: string[];
 }
 
 /** One rendered item in the chat transcript (UI). */
