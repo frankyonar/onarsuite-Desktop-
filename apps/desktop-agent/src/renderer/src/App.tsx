@@ -229,7 +229,7 @@ export function App() {
       </div>
       <div className="sidebar-resizer" onMouseDown={startResize} title="Trascina per regolare la larghezza" />
     </aside>
-    <main className="main-content">
+    <main className={`main-content view-${view}`}>
       <header className="topbar">
         <div><span className="eyebrow">ONARSUITE · AGENTE MAX</span><h1>{viewTitles[view]}</h1></div>
         <div className="topbar-actions">
@@ -899,4 +899,3 @@ function errorText(error: unknown) {
   msg = msg.replace(/^OnarSuite ha risposto \d+:\s*/, '').trim();
   return msg || 'Si è verificato un errore.';
 }
-
