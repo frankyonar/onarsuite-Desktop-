@@ -407,6 +407,8 @@ function AgentConsole({ convId, initialItems, onPersist, onPanel, onAssistantAct
     </div>
   </form>;
 
+  const composerDock = <div className="console-dock">{composer}</div>;
+
   return <div className={`console ${empty ? 'is-empty' : ''}`}>
     {empty
       ? <div className="console-hero">
@@ -422,7 +424,7 @@ function AgentConsole({ convId, initialItems, onPersist, onPanel, onAssistantAct
               {running && <div className="agent-indicator"><span className="dots"><i /><i /><i /></span>{status || 'Max sta lavorando…'}</div>}
             </div>
           </div>
-          {composer}
+          {composerDock}
         </>}
   </div>;
 }

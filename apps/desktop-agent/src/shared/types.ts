@@ -1,4 +1,4 @@
-﻿export const APP_VERSION = '0.9.22';
+export const APP_VERSION = '0.9.23';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
