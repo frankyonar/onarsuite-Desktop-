@@ -88,6 +88,7 @@ function registerIpc(): void {
   ipcMain.handle('fs:read', (_event, filePath: string) => runtime.readFileText(filePath));
   ipcMain.handle('fs:write', (_event, filePath: string, text: string) => runtime.writeFileText(filePath, text));
   ipcMain.handle('app:open-external', (_event, url: string) => shell.openExternal(url));
+  ipcMain.handle('auth:web-session-url', () => runtime.webSessionUrl());
   ipcMain.handle('onar:action', (_event, actionType: string, data: Record<string, unknown>) => runtime.onarCall(actionType, data ?? {}));
   ipcMain.handle('auth:web-login', (_event, serverUrl: string, appVersion: string) => {
     const base = serverUrl.replace(/\/+$/, '');

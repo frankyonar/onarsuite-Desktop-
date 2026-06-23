@@ -474,13 +474,16 @@ function LockPreview({ panel, onNotice }: { panel: PanelData; onNotice: (notice:
 function LockWeb({ serverUrl }: { serverUrl: string }) {
   const ref = useRef<{ goBack(): void; goForward(): void; reload(): void; loadURL(u: string): void; getURL(): string } | null>(null);
   const [loading, setLoading] = useState(true);
+  // Load a token-authenticated URL so OnarSuite opens already logged in.
+  const [src, setSrc] = useState<string>();
+  useEffect(() => { void window.maxDesktop.webSessionUrl().then(setSrc).catch(() => setSrc(serverUrl)); }, [serverUrl]);
   useEffect(() => {
     const wv = ref.current as unknown as { addEventListener: (e: string, cb: () => void) => void; removeEventListener: (e: string, cb: () => void) => void } | null;
     if (!wv) return;
     const on = () => setLoading(true); const off = () => setLoading(false);
     wv.addEventListener('did-start-loading', on); wv.addEventListener('did-stop-loading', off);
     return () => { wv.removeEventListener('did-start-loading', on); wv.removeEventListener('did-stop-loading', off); };
-  }, []);
+  }, [src]);
   return <div className="lock-web">
     <div className="lock-web-bar">
       <button onClick={() => ref.current?.goBack()} title="Indietro">‹</button>
@@ -490,7 +493,7 @@ function LockWeb({ serverUrl }: { serverUrl: string }) {
       <span className="lock-web-status">{loading ? 'Caricamento…' : 'OnarSuite'}</span>
       <button onClick={() => { const u = ref.current?.getURL(); if (u) void window.maxDesktop.openExternal(u); }} title="Apri nel browser">↗</button>
     </div>
-    {createElement('webview', { ref, className: 'lock-web-frame', src: serverUrl, partition: 'persist:onarsuite-web', allowpopups: 'true' } as Record<string, unknown>)}
+    {src && createElement('webview', { ref, className: 'lock-web-frame', src, partition: 'persist:onarsuite-web', allowpopups: 'true' } as Record<string, unknown>)}
   </div>;
 }
 

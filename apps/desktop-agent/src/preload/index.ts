@@ -51,6 +51,7 @@ const api: MaxDesktopApi = {
   openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),
   onar: (actionType: string, data: Record<string, unknown>) => ipcRenderer.invoke('onar:action', actionType, data),
   webLogin: (serverUrl: string, appVersion: string) => ipcRenderer.invoke('auth:web-login', serverUrl, appVersion),
+  webSessionUrl: () => ipcRenderer.invoke('auth:web-session-url'),
   onAuthChanged: (callback: () => void) => {
     const listener = (): void => callback();
     ipcRenderer.on('auth:changed', listener);
