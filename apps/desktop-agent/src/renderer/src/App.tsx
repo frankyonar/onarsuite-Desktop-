@@ -84,18 +84,35 @@ export function App() {
     setConversations(await window.maxDesktop.titleConversation(id).catch(() => []));
   }, []);
 
-  const [lockMode, setLockMode] = useState<'closed' | 'preview' | 'web'>('closed');
-  const [lockPanel, setLockPanel] = useState<PanelData>();
+  const [dockView, setDockView] = useState<DockView>(() => (localStorage.getItem('max-dock-view') as DockView) || 'closed');
+  const [dockTab, setDockTab] = useState<DockTab>(() => (localStorage.getItem('max-dock-tab') as DockTab) || 'anteprima');
   const [lockWebPath, setLockWebPath] = useState<string>();
-  const [lockWidth, setLockWidth] = useState(() => Number(localStorage.getItem('max-lock-w')) || 400);
+  const [outputs, setOutputs] = useState<PanelData[]>([]);
+  const [selectedOutput, setSelectedOutput] = useState(0);
+  const [winW, setWinW] = useState(() => window.innerWidth);
+  const [lockWidth, setLockWidth] = useState(() => Number(localStorage.getItem('max-lock-w')) || 440);
 
   useEffect(() => { localStorage.setItem('max-lock-w', String(lockWidth)); }, [lockWidth]);
+  useEffect(() => { localStorage.setItem('max-dock-view', dockView); }, [dockView]);
+  useEffect(() => { localStorage.setItem('max-dock-tab', dockTab); }, [dockTab]);
+  useEffect(() => { const on = () => setWinW(window.innerWidth); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on); }, []);
 
-  const showPanel = useCallback((p: PanelData) => { setLockPanel(p); setLockMode('preview'); }, []);
+  const showPanel = useCallback((p: PanelData) => {
+    setOutputs((prev) => {
+      const last = prev[prev.length - 1];
+      const next = last && last.title === p.title && last.kind === p.kind ? prev.slice(0, -1).concat(p) : prev.concat(p);
+      setSelectedOutput(next.length - 1);
+      return next;
+    });
+    setDockTab('output');
+    setDockView((v) => (v === 'closed' ? 'normal' : v));
+  }, []);
   const openWebDock = useCallback((nextPath?: string) => {
     setLockWebPath(nextPath);
-    setLockMode('web');
+    setDockTab('anteprima');
+    setDockView((v) => (v === 'closed' ? 'normal' : v));
   }, []);
+  const openDockTab = useCallback((t: DockTab) => { setDockTab(t); setDockView((v) => (v === 'normal' || v === 'expanded' ? v : 'normal')); }, []);
 
   const startLockResize = useCallback((event: ReactMouseEvent) => {
     event.preventDefault();
@@ -201,7 +218,8 @@ export function App() {
   if (!snapshot) return <StartupScreen error={startupError} onRetry={() => void refresh().catch((error) => setStartupError(errorText(error)))} />;
   if (snapshot.connection === 'not_paired') return <PairingPage snapshot={snapshot} busy={busy} notice={notice} onPair={(input) => run(() => window.maxDesktop.pair(input))} />;
 
-  return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)${lockMode !== 'closed' ? ` ${lockWidth}px` : ''}` }}>
+  const dockW = dockView === 'closed' ? 0 : dockView === 'rail' ? 52 : dockView === 'expanded' ? Math.max(420, Math.min(Math.round(winW * 0.62), winW - sidebarWidth - 380)) : lockWidth;
+  return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)${dockView !== 'closed' ? ` ${dockW}px` : ''}` }}>
     <aside className="sidebar">
       <div className="brand"><AppLogo theme={theme} planName={snapshot.planName} /></div>
       <button className="new-chat" onClick={() => void newChat()}><span>+</span>Nuova chat</button>
@@ -239,9 +257,9 @@ export function App() {
         <div className="topbar-title">{viewTitles[view]}</div>
         <div className="topbar-actions">
           {snapshot.pendingActions > 0 && <span className="queue-count">{snapshot.pendingActions} in coda</span>}
-          <button className={`topbar-icon ${lockMode === 'web' ? 'active' : ''}`} title="OnarSuite web" onClick={() => {
-            setLockWebPath(undefined);
-            setLockMode((m) => (m === 'web' ? 'closed' : 'web'));
+          <button className={`topbar-icon ${dockView !== 'closed' && dockTab === 'anteprima' ? 'active' : ''}`} title="OnarSuite web" onClick={() => {
+            if (dockView !== 'closed' && dockTab === 'anteprima') { setDockView('closed'); }
+            else { setLockWebPath(undefined); openWebDock(undefined); }
           }}>◎</button>
           <button className="topbar-icon" title="Tema chiaro/scuro" onClick={toggleTheme}>{theme === 'dark' ? '☀' : '☾'}</button>
           <button className="topbar-icon" title="Sincronizza" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}>⟳</button>
@@ -258,7 +276,7 @@ export function App() {
       {view === 'logs' && <LogsView logs={logs} />}
       {view === 'settings' && <SettingsView snapshot={snapshot} busy={busy} onDisconnect={() => run(() => window.maxDesktop.disconnect())} onClear={() => run(() => window.maxDesktop.clearLocalData())} />}
     </main>
-    {lockMode !== 'closed' && <Lock mode={lockMode === 'web' ? 'web' : 'preview'} panel={lockPanel} serverUrl={snapshot.serverUrl} webPath={lockWebPath} onMode={setLockMode} onClose={() => { setLockMode('closed'); setLockWebPath(undefined); }} onResize={startLockResize} onNotice={setNotice} onHome={() => setLockWebPath(undefined)} />}
+    {dockView !== 'closed' && <WorkspaceDock view={dockView} tab={dockTab} snapshot={snapshot} files={files} logs={logs} serverUrl={snapshot.serverUrl} webPath={lockWebPath} outputs={outputs} selectedOutput={selectedOutput} onTab={openDockTab} onSelectOutput={setSelectedOutput} onRail={() => setDockView('rail')} onToggleExpand={() => setDockView((v) => (v === 'expanded' ? 'normal' : 'expanded'))} onClose={() => { setDockView('closed'); setLockWebPath(undefined); }} onResize={startLockResize} onAddFolder={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemoveFolder={(f) => run(() => window.maxDesktop.removeAuthorizedFolder(f))} onAnalyze={(f) => { setAttachments((a) => a.some((x) => x.path === f.path) ? a : a.concat(f)); setView('agent'); setNotice({ tone: 'success', text: `${f.name} pronto: scrivi a Max cosa farne.` }); }} onNotice={setNotice} />}
   </div>;
 }
 
@@ -429,26 +447,128 @@ function AgentConsole({ convId, initialItems, onPersist, onPanel, onAssistantAct
   </div>;
 }
 
-type LockMode = 'preview' | 'web';
+type DockTab = 'anteprima' | 'contesto' | 'file' | 'attivita' | 'output';
+type DockView = 'closed' | 'rail' | 'normal' | 'expanded';
 
-/** The right column ("lock"): structured preview / file editor, or the logged-in
- *  OnarSuite web app for actions only available on the web. Resizable. */
-function Lock({ mode, panel, serverUrl, webPath, onMode, onClose, onResize, onNotice, onHome }: { mode: LockMode; panel?: PanelData; serverUrl: string; webPath?: string; onMode: (mode: LockMode) => void; onClose: () => void; onResize: (event: ReactMouseEvent) => void; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void; onHome: () => void }) {
-  return <aside className="lock">
-    <div className="lock-resizer" onMouseDown={onResize} title="Trascina per ridimensionare" />
-    <header className="lock-head">
-      <div className="lock-tabs">
-        <button className={mode === 'preview' ? 'active' : ''} disabled={!panel} onClick={() => onMode('preview')}>Anteprima</button>
-        <button className={mode === 'web' ? 'active' : ''} onClick={() => onMode('web')}>OnarSuite web</button>
+const DOCK_TABS: Array<{ id: DockTab; label: string; icon: string }> = [
+  { id: 'anteprima', label: 'Anteprima', icon: '◫' },
+  { id: 'contesto', label: 'Contesto', icon: '◎' },
+  { id: 'file', label: 'File', icon: '▤' },
+  { id: 'attivita', label: 'Attività', icon: '≡' },
+  { id: 'output', label: 'Output', icon: '◆' },
+];
+const OUT_ICONS: Record<PanelData['kind'], string> = { customer: '◉', contract: '▤', reminder: '⏰', file: '◇', table: '▦', result: '◆' };
+
+/** The right "Workspace Dock": a Codex-style multi-tab side panel (web preview,
+ *  Max context, files, activity, generated outputs). Resizable / rail / expanded. */
+function WorkspaceDock(props: {
+  view: DockView; tab: DockTab; snapshot: AppSnapshot; files: LocalFile[]; logs: AuditEntry[];
+  serverUrl: string; webPath?: string; outputs: PanelData[]; selectedOutput: number;
+  onTab: (t: DockTab) => void; onSelectOutput: (i: number) => void;
+  onRail: () => void; onToggleExpand: () => void; onClose: () => void; onResize: (e: ReactMouseEvent) => void;
+  onAddFolder: () => void; onRemoveFolder: (f: string) => void; onAnalyze: (f: LocalFile) => void; onNotice: (n: Notice) => void;
+}) {
+  const { view, tab, snapshot, files, logs, serverUrl, webPath, outputs, selectedOutput } = props;
+  if (view === 'rail') {
+    return <aside className="dock dock-rail">
+      <button className="dock-rail-btn open" title="Apri Workspace" aria-label="Apri Workspace" onClick={() => props.onTab(tab)}>‹</button>
+      {DOCK_TABS.map((t) => <button key={t.id} className={`dock-rail-btn ${tab === t.id ? 'active' : ''}`} title={t.label} aria-label={t.label} onClick={() => props.onTab(t.id)}>{t.icon}</button>)}
+    </aside>;
+  }
+  const tabLabel = DOCK_TABS.find((t) => t.id === tab)?.label ?? '';
+  return <aside className="dock">
+    <div className="dock-resizer" onMouseDown={props.onResize} title="Trascina per ridimensionare" />
+    <header className="dock-head">
+      <div className="dock-id"><strong>Workspace</strong><span>{tabLabel}</span></div>
+      <DockStatus connection={snapshot.connection} />
+      <div className="dock-tools">
+        <button title="Espandi / riduci" aria-label="Espandi" onClick={props.onToggleExpand}>{view === 'expanded' ? '⤡' : '⤢'}</button>
+        <button title="Riduci a barra" aria-label="Riduci a barra" onClick={props.onRail}>‒</button>
+        <button title="Chiudi pannello" aria-label="Chiudi pannello" onClick={props.onClose}>×</button>
       </div>
-      <button className="lock-close" onClick={onClose} title="Chiudi">×</button>
     </header>
-    <div className="lock-body">
-      {mode === 'web'
-        ? <LockWeb serverUrl={serverUrl} nextPath={webPath} onHome={onHome} />
-        : panel ? <LockPreview panel={panel} onNotice={onNotice} /> : <div className="lock-empty">Nessuna anteprima. Chiedi a Max di leggere o creare qualcosa.</div>}
+    <nav className="dock-tabs" role="tablist">
+      {DOCK_TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'active' : ''} onClick={() => props.onTab(t.id)}><span>{t.icon}</span>{t.label}</button>)}
+    </nav>
+    <div className="dock-content">
+      {tab === 'anteprima' && <LockWeb serverUrl={serverUrl} nextPath={webPath} onHome={() => undefined} />}
+      {tab === 'contesto' && <DockContext snapshot={snapshot} files={files} />}
+      {tab === 'file' && <DockFiles snapshot={snapshot} files={files} onAddFolder={props.onAddFolder} onRemoveFolder={props.onRemoveFolder} onAnalyze={props.onAnalyze} />}
+      {tab === 'attivita' && <DockActivity logs={logs} />}
+      {tab === 'output' && <DockOutput outputs={outputs} selected={selectedOutput} onSelect={props.onSelectOutput} onNotice={props.onNotice} />}
     </div>
   </aside>;
+}
+
+function DockStatus({ connection }: { connection: AppSnapshot['connection'] }) {
+  const map: Record<AppSnapshot['connection'], [string, string]> = { connected: ['Connesso', 'ok'], offline: ['Offline', 'warn'], error: ['Errore', 'err'], revoked: ['Revocato', 'err'], not_paired: ['Non collegato', 'warn'] };
+  const [label, tone] = map[connection] ?? ['—', 'warn'];
+  return <span className={`dock-status ${tone}`} aria-label={`Stato: ${label}`}><i />{label}</span>;
+}
+
+function DockContext({ snapshot, files }: { snapshot: AppSnapshot; files: LocalFile[] }) {
+  return <div className="dock-pane">
+    <section className="dock-block">
+      <h4>Workspace attivo</h4>
+      <p className="dock-strong">{snapshot.accountLabel || snapshot.deviceName}</p>
+      <p className="dock-dim">{snapshot.deviceName}</p>
+    </section>
+    <section className="dock-block">
+      <h4>Max può accedere a</h4>
+      <ul className="dock-list">
+        <li>File locali autorizzati ({snapshot.authorizedFolders.length + 1} cartelle)</li>
+        <li>Moduli OnarSuite</li>
+        <li>Anteprima web</li>
+      </ul>
+    </section>
+    <section className="dock-block">
+      <h4>Modalità Max</h4>
+      <span className="dock-chip">Autonomo</span>
+    </section>
+    <section className="dock-block">
+      <h4>Permessi attuali</h4>
+      <div className="dock-perms">{snapshot.permissions.map((p) => <span key={p} className="dock-perm">{p}</span>)}</div>
+    </section>
+    <section className="dock-block">
+      <h4>File visibili</h4>
+      <p className="dock-dim">{files.length} documenti nelle cartelle autorizzate</p>
+    </section>
+  </div>;
+}
+
+function DockFiles({ snapshot, files, onAddFolder, onRemoveFolder, onAnalyze }: { snapshot: AppSnapshot; files: LocalFile[]; onAddFolder: () => void; onRemoveFolder: (f: string) => void; onAnalyze: (f: LocalFile) => void }) {
+  const [q, setQ] = useState('');
+  const recent = files.filter((f) => f.name.toLowerCase().includes(q.toLowerCase())).slice(0, 14);
+  return <div className="dock-pane">
+    <div className="dock-search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca file…" /></div>
+    <section className="dock-block">
+      <div className="dock-block-head"><h4>Cartelle autorizzate</h4><button className="dock-mini" onClick={onAddFolder}>+ Autorizza</button></div>
+      <div className="dock-folders">
+        <div className="dock-folder"><span className="dock-folder-name">OnarSuite Workspace</span><span className="dock-badge">sempre</span></div>
+        {snapshot.authorizedFolders.map((f) => <div key={f} className="dock-folder"><span className="dock-folder-name" title={f}>{f.split(/[\\/]/).pop()}</span><button className="dock-mini ghost" onClick={() => onRemoveFolder(f)}>Rimuovi</button></div>)}
+      </div>
+    </section>
+    <section className="dock-block">
+      <h4>File recenti</h4>
+      {recent.length === 0
+        ? <EmptyState icon="▤" title="Nessun file">Autorizza una cartella o trascina file nella chat.</EmptyState>
+        : <div className="dock-files">{recent.map((f) => <div key={f.path} className="dock-file"><span className="dock-file-name" title={f.name}>{f.name}</span><div className="dock-file-acts"><button className="dock-mini ghost" onClick={() => void window.maxDesktop.openFile(f.path)}>Apri</button><button className="dock-mini" onClick={() => onAnalyze(f)}>Analizza</button></div></div>)}</div>}
+    </section>
+  </div>;
+}
+
+function DockActivity({ logs }: { logs: AuditEntry[] }) {
+  if (!logs.length) return <div className="dock-pane"><EmptyState icon="≡" title="Nessuna attività">Le azioni di Max appariranno qui in ordine cronologico.</EmptyState></div>;
+  return <div className="dock-pane"><div className="dock-timeline">{logs.slice(0, 50).map((l) => <div key={l.id} className="dock-event"><span className={`dock-dot ${l.level}`} /><div className="dock-event-body"><strong>{l.message}</strong><small>{formatDate(l.createdAt)} · {l.eventType}</small></div></div>)}</div></div>;
+}
+
+function DockOutput({ outputs, selected, onSelect, onNotice }: { outputs: PanelData[]; selected: number; onSelect: (i: number) => void; onNotice: (n: Notice) => void }) {
+  if (!outputs.length) return <div className="dock-pane"><EmptyState icon="◆" title="Nessun output generato">Quando Max crea preventivi, PDF, documenti o codice, appariranno qui.</EmptyState></div>;
+  const current = outputs[Math.min(selected, outputs.length - 1)];
+  return <div className="dock-output">
+    <div className="dock-output-list">{outputs.map((o, i) => <button key={i} className={i === selected ? 'active' : ''} onClick={() => onSelect(i)}><span className="dock-out-icon">{OUT_ICONS[o.kind] ?? '◆'}</span><span className="dock-out-title" title={o.title}>{o.title}</span></button>)}</div>
+    <div className="dock-output-view"><LockPreview panel={current} onNotice={onNotice} /></div>
+  </div>;
 }
 
 function LockPreview({ panel, onNotice }: { panel: PanelData; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void }) {
