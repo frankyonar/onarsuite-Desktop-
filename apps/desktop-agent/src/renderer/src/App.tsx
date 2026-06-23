@@ -231,12 +231,12 @@ export function App() {
     </aside>
     <main className={`main-content view-${view}`}>
       <header className="topbar">
-        <div><span className="eyebrow">ONARSUITE · AGENTE MAX</span><h1>{viewTitles[view]}</h1></div>
+        <div className="topbar-title">{viewTitles[view]}</div>
         <div className="topbar-actions">
           {snapshot.pendingActions > 0 && <span className="queue-count">{snapshot.pendingActions} in coda</span>}
-          <Button variant="secondary" onClick={() => setLockMode((m) => m === 'web' ? 'closed' : 'web')}>OnarSuite web</Button>
-          <button className="theme-toggle" title="Tema chiaro/scuro" onClick={toggleTheme}>{theme === 'dark' ? '☀' : '☾'}</button>
-          <Button variant="secondary" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}>Sincronizza</Button>
+          <button className={`topbar-icon ${lockMode === 'web' ? 'active' : ''}`} title="OnarSuite web" onClick={() => setLockMode((m) => m === 'web' ? 'closed' : 'web')}>◎</button>
+          <button className="topbar-icon" title="Tema chiaro/scuro" onClick={toggleTheme}>{theme === 'dark' ? '☀' : '☾'}</button>
+          <button className="topbar-icon" title="Sincronizza" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}>⟳</button>
         </div>
       </header>
       <UpdateBanner state={updateState} busy={updateBusy} onAction={handleUpdateAction} />
