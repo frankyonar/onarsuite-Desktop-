@@ -113,6 +113,14 @@ export class DesktopRuntime {
     await this.heartbeat();
   }
 
+  /** URL that logs the device's user into a web session for the embedded webview. */
+  async webSessionUrl(): Promise<string> {
+    const config = await this.config.read();
+    const base = (config.serverUrl || 'https://onarsuite.com').replace(/\/+$/, '');
+    const token = await this.config.getToken();
+    return token ? `${base}/desktop/web-login?token=${encodeURIComponent(token)}` : base;
+  }
+
   async disconnect(): Promise<AppSnapshot> {
     const config = await this.config.read();
     await this.audit.write('device_disconnected', 'security', 'Pairing locale rimosso', { deviceId: config.deviceId ?? null });

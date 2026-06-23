@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.14';
+export const APP_VERSION = '0.9.17';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -251,6 +251,7 @@ export interface MaxDesktopApi {
   openExternal(url: string): Promise<void>;
   onar(actionType: string, data: Record<string, unknown>): Promise<OnarResult>;
   webLogin(serverUrl: string, appVersion: string): Promise<void>;
+  webSessionUrl(): Promise<string>;
   onAuthChanged(callback: () => void): () => void;
 }
 
