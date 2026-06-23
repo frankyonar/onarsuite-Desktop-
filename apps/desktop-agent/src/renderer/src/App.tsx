@@ -475,8 +475,23 @@ function LockWeb({ serverUrl }: { serverUrl: string }) {
   const ref = useRef<{ goBack(): void; goForward(): void; reload(): void; loadURL(u: string): void; getURL(): string } | null>(null);
   const [loading, setLoading] = useState(true);
   // Load a token-authenticated URL so OnarSuite opens already logged in.
+  const [sessionUrl, setSessionUrl] = useState<string>();
   const [src, setSrc] = useState<string>();
-  useEffect(() => { void window.maxDesktop.webSessionUrl().then(setSrc).catch(() => setSrc(serverUrl)); }, [serverUrl]);
+  useEffect(() => {
+    let alive = true;
+    void window.maxDesktop.webSessionUrl()
+      .then((url) => {
+        if (!alive) return;
+        setSessionUrl(url);
+        setSrc(url);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setSessionUrl(serverUrl);
+        setSrc(serverUrl);
+      });
+    return () => { alive = false; };
+  }, [serverUrl]);
   useEffect(() => {
     const wv = ref.current as unknown as { addEventListener: (e: string, cb: () => void) => void; removeEventListener: (e: string, cb: () => void) => void } | null;
     if (!wv) return;
@@ -489,7 +504,7 @@ function LockWeb({ serverUrl }: { serverUrl: string }) {
       <button onClick={() => ref.current?.goBack()} title="Indietro">‹</button>
       <button onClick={() => ref.current?.goForward()} title="Avanti">›</button>
       <button onClick={() => ref.current?.reload()} title="Ricarica">⟳</button>
-      <button onClick={() => ref.current?.loadURL(serverUrl)} title="Home">⌂</button>
+      <button disabled={!sessionUrl} onClick={() => sessionUrl && ref.current?.loadURL(sessionUrl)} title="Account OnarSuite">⌂</button>
       <span className="lock-web-status">{loading ? 'Caricamento…' : 'OnarSuite'}</span>
       <button onClick={() => { const u = ref.current?.getURL(); if (u) void window.maxDesktop.openExternal(u); }} title="Apri nel browser">↗</button>
     </div>
