@@ -1,6 +1,6 @@
 {
   "name": "@onarsuite/max-desktop",
-  "version": "0.9.15",
+  "version": "0.9.16",
   "private": true,
   "description": "OnarSuite - agente desktop locale sicuro con Max AI",
   "main": "out/main/index.js",
