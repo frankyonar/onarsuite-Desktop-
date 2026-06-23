@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.20', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.21', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', planName: 'PRO', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -119,7 +119,12 @@ export function createPreviewApi(): MaxDesktopApi {
     writeFileText: async () => undefined,
     openExternal: async () => undefined,
     webLogin: async () => undefined,
-    webSessionUrl: async () => 'https://onarsuite.com/desktop/web-login?token=preview',
+    webSessionUrl: async (nextPath?: string) => {
+      const url = new URL('https://onarsuite.com/desktop/web-login');
+      url.searchParams.set('token', 'preview');
+      if (nextPath && nextPath.startsWith('/')) url.searchParams.set('next', nextPath);
+      return url.toString();
+    },
     onAuthChanged: () => () => undefined,
     onar: async (actionType) => {
       if (actionType === 'list_reminders') return { success: true, message: '2 promemoria', data: { reminders: [{ id: 1, title: 'Richiamare Rossi', date: '2026-06-25', priority: 'high' }, { id: 2, title: 'Inviare preventivo', date: '2026-06-28', priority: 'medium' }] } };

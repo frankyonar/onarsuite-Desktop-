@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { APP_VERSION, type AgentMessage, type ChatMessage, type PairingInput, type PairingResponse } from '../../shared/types';
+import type { AssistantActionMode } from '../../shared/types';
 
 export class AgentSdk {
   constructor(
@@ -30,6 +31,17 @@ export class AgentSdk {
 
   async sendEvent(payload: Record<string, unknown>): Promise<void> {
     await this.request('/api/agent/events', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  async createAssistantAction(input: { action: string; route: string; mode: AssistantActionMode; prefill: Record<string, unknown> }): Promise<{ action_id: string; open_url: string }> {
+    return this.request<{ action_id: string; open_url: string }>('/api/assistant/actions', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async getAssistantAction(actionId: string): Promise<{ action_id: string; action: string; route: string; mode: AssistantActionMode; status: string; prefill: Record<string, unknown>; dock_title?: string; expires_at?: string; opened_at?: string; completed_at?: string; cancelled_at?: string; message?: string }> {
+    return this.request(`/api/assistant/actions/${encodeURIComponent(actionId)}`, {});
   }
 
   async uploadArtifact(filePath: string, deviceId: string, idempotencyKey: string): Promise<unknown> {

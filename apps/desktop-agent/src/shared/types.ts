@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.20';
+export const APP_VERSION = '0.9.21';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -36,6 +36,8 @@ export const BLOCKED_SCOPES = [
 export type ConnectionState = 'connected' | 'offline' | 'not_paired' | 'revoked' | 'error';
 export type LogLevel = 'info' | 'warning' | 'error' | 'security';
 export type FileAction = 'upload' | 'create_task' | 'create_customer_draft' | 'create_quote_draft';
+export type AssistantActionMode = 'view' | 'create' | 'edit';
+export type AssistantActionStatus = 'pending' | 'opened' | 'completed' | 'cancelled' | 'expired';
 
 /** Local tools Max can call during an agent run. */
 export type ToolName =
@@ -79,6 +81,7 @@ export interface PanelData {
 export type AgentStreamEvent =
   | { type: 'status'; runId: string; text: string }
   | { type: 'assistant'; runId: string; text: string }
+  | { type: 'assistant_action'; runId: string; actionId: string; action: string; route: string; mode: AssistantActionMode; title: string; openUrl: string; prefill: Record<string, unknown> }
   | { type: 'tool_start'; runId: string; id: string; tool: ToolName; title: string; command: string }
   | { type: 'tool_end'; runId: string; id: string; ok: boolean; preview: string; isDiff?: boolean }
   | { type: 'panel'; runId: string; panel: PanelData }
@@ -89,6 +92,7 @@ export interface AgentRunInput {
   message: string;
   /** Prior plain chat turns shown in the console, for continuity. */
   history: ChatMessage[];
+  conversationId?: string;
   filePaths?: string[];
 }
 
@@ -251,7 +255,7 @@ export interface MaxDesktopApi {
   openExternal(url: string): Promise<void>;
   onar(actionType: string, data: Record<string, unknown>): Promise<OnarResult>;
   webLogin(serverUrl: string, appVersion: string): Promise<void>;
-  webSessionUrl(): Promise<string>;
+  webSessionUrl(nextPath?: string): Promise<string>;
   onAuthChanged(callback: () => void): () => void;
 }
 

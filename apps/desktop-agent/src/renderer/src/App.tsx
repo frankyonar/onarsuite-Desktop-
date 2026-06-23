@@ -86,11 +86,16 @@ export function App() {
 
   const [lockMode, setLockMode] = useState<'closed' | 'preview' | 'web'>('closed');
   const [lockPanel, setLockPanel] = useState<PanelData>();
+  const [lockWebPath, setLockWebPath] = useState<string>();
   const [lockWidth, setLockWidth] = useState(() => Number(localStorage.getItem('max-lock-w')) || 400);
 
   useEffect(() => { localStorage.setItem('max-lock-w', String(lockWidth)); }, [lockWidth]);
 
   const showPanel = useCallback((p: PanelData) => { setLockPanel(p); setLockMode('preview'); }, []);
+  const openWebDock = useCallback((nextPath?: string) => {
+    setLockWebPath(nextPath);
+    setLockMode('web');
+  }, []);
 
   const startLockResize = useCallback((event: ReactMouseEvent) => {
     event.preventDefault();
@@ -234,7 +239,10 @@ export function App() {
         <div className="topbar-title">{viewTitles[view]}</div>
         <div className="topbar-actions">
           {snapshot.pendingActions > 0 && <span className="queue-count">{snapshot.pendingActions} in coda</span>}
-          <button className={`topbar-icon ${lockMode === 'web' ? 'active' : ''}`} title="OnarSuite web" onClick={() => setLockMode((m) => m === 'web' ? 'closed' : 'web')}>◎</button>
+          <button className={`topbar-icon ${lockMode === 'web' ? 'active' : ''}`} title="OnarSuite web" onClick={() => {
+            setLockWebPath(undefined);
+            setLockMode((m) => (m === 'web' ? 'closed' : 'web'));
+          }}>◎</button>
           <button className="topbar-icon" title="Tema chiaro/scuro" onClick={toggleTheme}>{theme === 'dark' ? '☀' : '☾'}</button>
           <button className="topbar-icon" title="Sincronizza" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}>⟳</button>
         </div>
@@ -243,14 +251,14 @@ export function App() {
       {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
       {view === 'onarsuite' && <OnarHome onNotice={setNotice} onGoClients={() => setView('clients')} />}
       {view === 'clients' && <ClientsView />}
-      {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} onPersist={(items) => void persistConversation(activeConv.id, items)} onPanel={showPanel} onTitle={(id) => void titleConversation(id)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
+      {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} onPersist={(items) => void persistConversation(activeConv.id, items)} onPanel={showPanel} onAssistantAction={(openUrl) => { const nextPath = openUrl ? new URL(openUrl).pathname + new URL(openUrl).search : undefined; openWebDock(nextPath); setNotice({ tone: 'success', text: 'Max ha preparato questa operazione nel pannello laterale.' }); }} onTitle={(id) => void titleConversation(id)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
       {view === 'dashboard' && <Dashboard snapshot={snapshot} files={files} logs={logs} onGoAgent={() => setView('agent')} onSync={() => run(() => window.maxDesktop.syncNow())} />}
       {view === 'folders' && <FoldersView snapshot={snapshot} busy={busy} onAdd={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemove={(folder) => run(() => window.maxDesktop.removeAuthorizedFolder(folder))} onDrop={importDrop} onChoose={() => run(() => window.maxDesktop.chooseFiles(), 'File aggiunti alla workspace.')} />}
       {view === 'logs' && <LogsView logs={logs} />}
       {view === 'settings' && <SettingsView snapshot={snapshot} busy={busy} onDisconnect={() => run(() => window.maxDesktop.disconnect())} onClear={() => run(() => window.maxDesktop.clearLocalData())} />}
     </main>
-    {lockMode !== 'closed' && <Lock mode={lockMode === 'web' ? 'web' : 'preview'} panel={lockPanel} serverUrl={snapshot.serverUrl} onMode={setLockMode} onClose={() => setLockMode('closed')} onResize={startLockResize} onNotice={setNotice} />}
+    {lockMode !== 'closed' && <Lock mode={lockMode === 'web' ? 'web' : 'preview'} panel={lockPanel} serverUrl={snapshot.serverUrl} webPath={lockWebPath} onMode={setLockMode} onClose={() => { setLockMode('closed'); setLockWebPath(undefined); }} onResize={startLockResize} onNotice={setNotice} onHome={() => setLockWebPath(undefined)} />}
   </div>;
 }
 
@@ -296,7 +304,7 @@ const SUGGESTIONS = [
   'Mostrami le attività di oggi',
 ];
 
-function AgentConsole({ convId, initialItems, onPersist, onPanel, onTitle, attachments, onAttachmentsChange, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; onPanel: (panel: PanelData) => void; onTitle: (id: string) => void; attachments: LocalFile[]; onAttachmentsChange: (files: LocalFile[]) => void; onAfterRun: () => void; accountLabel?: string }) {
+function AgentConsole({ convId, initialItems, onPersist, onPanel, onAssistantAction, onTitle, attachments, onAttachmentsChange, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; onPanel: (panel: PanelData) => void; onAssistantAction: (openUrl: string) => void; onTitle: (id: string) => void; attachments: LocalFile[]; onAttachmentsChange: (files: LocalFile[]) => void; onAfterRun: () => void; accountLabel?: string }) {
   const [items, setItems] = useState<ConsoleItem[]>(initialItems);
   const [status, setStatus] = useState<string>();
   const [running, setRunning] = useState(false);
@@ -310,6 +318,7 @@ function AgentConsole({ convId, initialItems, onPersist, onPanel, onTitle, attac
       setItems((prev) => reduceEvent(prev, event));
       if (event.type === 'status') setStatus(event.text);
       if (event.type === 'panel') onPanel(event.panel);
+      if (event.type === 'assistant_action') onAssistantAction(event.openUrl);
       if (event.type === 'done' || event.type === 'error') { setRunning(false); setStatus(undefined); }
     });
     return unsubscribe;
@@ -335,7 +344,7 @@ function AgentConsole({ convId, initialItems, onPersist, onPanel, onTitle, attac
     setItems((prev) => [...prev, { kind: 'user', id: crypto.randomUUID(), text: message || '[allegati]' }]);
     setRunning(true); setStatus('Max sta pensando…');
     onAttachmentsChange([]);
-    try { await window.maxDesktop.runAgent({ message, history: [], filePaths }); }
+    try { await window.maxDesktop.runAgent({ message, history: [], filePaths, conversationId: convId }); }
     catch (error) { setItems((prev) => [...prev, { kind: 'assistant', id: crypto.randomUUID(), text: `⚠ ${errorText(error)}` }]); setRunning(false); setStatus(undefined); }
     finally { onAfterRun(); }
   };
@@ -422,7 +431,7 @@ type LockMode = 'preview' | 'web';
 
 /** The right column ("lock"): structured preview / file editor, or the logged-in
  *  OnarSuite web app for actions only available on the web. Resizable. */
-function Lock({ mode, panel, serverUrl, onMode, onClose, onResize, onNotice }: { mode: LockMode; panel?: PanelData; serverUrl: string; onMode: (mode: LockMode) => void; onClose: () => void; onResize: (event: ReactMouseEvent) => void; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void }) {
+function Lock({ mode, panel, serverUrl, webPath, onMode, onClose, onResize, onNotice, onHome }: { mode: LockMode; panel?: PanelData; serverUrl: string; webPath?: string; onMode: (mode: LockMode) => void; onClose: () => void; onResize: (event: ReactMouseEvent) => void; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void; onHome: () => void }) {
   return <aside className="lock">
     <div className="lock-resizer" onMouseDown={onResize} title="Trascina per ridimensionare" />
     <header className="lock-head">
@@ -434,7 +443,7 @@ function Lock({ mode, panel, serverUrl, onMode, onClose, onResize, onNotice }: {
     </header>
     <div className="lock-body">
       {mode === 'web'
-        ? <LockWeb serverUrl={serverUrl} />
+        ? <LockWeb serverUrl={serverUrl} nextPath={webPath} onHome={onHome} />
         : panel ? <LockPreview panel={panel} onNotice={onNotice} /> : <div className="lock-empty">Nessuna anteprima. Chiedi a Max di leggere o creare qualcosa.</div>}
     </div>
   </aside>;
@@ -471,27 +480,25 @@ function LockPreview({ panel, onNotice }: { panel: PanelData; onNotice: (notice:
   </div>;
 }
 
-function LockWeb({ serverUrl }: { serverUrl: string }) {
+function LockWeb({ serverUrl, nextPath, onHome }: { serverUrl: string; nextPath?: string; onHome: () => void }) {
   const ref = useRef<{ goBack(): void; goForward(): void; reload(): void; loadURL(u: string): void; getURL(): string } | null>(null);
   const [loading, setLoading] = useState(true);
   // Load a token-authenticated URL so OnarSuite opens already logged in.
-  const [sessionUrl, setSessionUrl] = useState<string>();
   const [src, setSrc] = useState<string>();
   useEffect(() => {
     let alive = true;
-    void window.maxDesktop.webSessionUrl()
+    setLoading(true);
+    void window.maxDesktop.webSessionUrl(nextPath)
       .then((url) => {
         if (!alive) return;
-        setSessionUrl(url);
         setSrc(url);
       })
       .catch(() => {
         if (!alive) return;
-        setSessionUrl(serverUrl);
         setSrc(serverUrl);
       });
     return () => { alive = false; };
-  }, [serverUrl]);
+  }, [nextPath, serverUrl]);
   useEffect(() => {
     const wv = ref.current as unknown as { addEventListener: (e: string, cb: () => void) => void; removeEventListener: (e: string, cb: () => void) => void } | null;
     if (!wv) return;
@@ -504,7 +511,7 @@ function LockWeb({ serverUrl }: { serverUrl: string }) {
       <button onClick={() => ref.current?.goBack()} title="Indietro">‹</button>
       <button onClick={() => ref.current?.goForward()} title="Avanti">›</button>
       <button onClick={() => ref.current?.reload()} title="Ricarica">⟳</button>
-      <button disabled={!sessionUrl} onClick={() => sessionUrl && ref.current?.loadURL(sessionUrl)} title="Account OnarSuite">⌂</button>
+      <button onClick={() => { onHome(); void window.maxDesktop.webSessionUrl().then((url) => ref.current?.loadURL(url)); }} title="Account OnarSuite">⌂</button>
       <span className="lock-web-status">{loading ? 'Caricamento…' : 'OnarSuite'}</span>
       <button onClick={() => { const u = ref.current?.getURL(); if (u) void window.maxDesktop.openExternal(u); }} title="Apri nel browser">↗</button>
     </div>

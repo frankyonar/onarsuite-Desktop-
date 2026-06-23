@@ -11,6 +11,7 @@ import { ConversationStore } from './services/conversation-store';
 import { AuditLog } from './services/audit-log';
 import { ConfigStore } from './services/config-store';
 import { isSupportedFile, parseDocument } from './services/document-parser';
+import { AssistantActionOrchestrator } from './services/assistant-actions';
 
 const MAX_READ_BYTES = 500 * 1024;
 
@@ -32,6 +33,12 @@ export class DesktopRuntime {
     async () => (await this.config.read()).serverUrl,
     async () => this.config.getToken(),
   );
+  readonly assistantActions = new AssistantActionOrchestrator(
+    this.sdk,
+    this.audit,
+    this.config.dataDirectory,
+    async () => (await this.config.read()).serverUrl,
+  );
   readonly tools = new AgentTools(
     this.config,
     this.audit,
@@ -44,6 +51,7 @@ export class DesktopRuntime {
   private connection: AppSnapshot['connection'] = 'not_paired';
   private readonly queuePath = path.join(this.config.dataDirectory, 'queue.json');
   private syncInProgress = false;
+  private readonly assistantActionWatchers = new Set<string>();
 
   async initialize(): Promise<void> {
     const config = await this.config.read();
@@ -114,11 +122,15 @@ export class DesktopRuntime {
   }
 
   /** URL that logs the device's user into a web session for the embedded webview. */
-  async webSessionUrl(): Promise<string> {
+  async webSessionUrl(nextPath?: string): Promise<string> {
     const config = await this.config.read();
     const base = (config.serverUrl || 'https://onarsuite.com').replace(/\/+$/, '');
     const token = await this.config.getToken();
-    return token ? `${base}/desktop/web-login?token=${encodeURIComponent(token)}` : base;
+    if (!token) return base;
+    const url = new URL(`${base}/desktop/web-login`);
+    url.searchParams.set('token', token);
+    if (nextPath && nextPath.startsWith('/')) url.searchParams.set('next', nextPath);
+    return url.toString();
   }
 
   async disconnect(): Promise<AppSnapshot> {
@@ -354,6 +366,27 @@ export class DesktopRuntime {
       return;
     }
 
+    const assistantOutcome = await this.assistantActions.handleMessage(input.conversationId, message);
+    if (assistantOutcome) {
+      emit({ type: 'assistant', runId: 'assistant', text: assistantOutcome.text });
+      if (assistantOutcome.action) {
+        emit({
+          type: 'assistant_action',
+          runId: 'assistant',
+          actionId: assistantOutcome.action.actionId,
+          action: assistantOutcome.action.action,
+          route: assistantOutcome.action.route,
+          mode: assistantOutcome.action.mode,
+          title: assistantOutcome.action.title,
+          openUrl: assistantOutcome.action.openUrl,
+          prefill: assistantOutcome.action.prefill,
+        });
+        void this.watchAssistantAction(assistantOutcome.action.actionId, emit);
+      }
+      emit({ type: 'done', runId: 'assistant' });
+      return;
+    }
+
     let fileContext: string | undefined;
     const filePaths = Array.from(new Set(input.filePaths ?? [])).filter(Boolean);
     if (filePaths.length) {
@@ -378,6 +411,38 @@ export class DesktopRuntime {
 
   resetAgent(): void {
     this.engine.reset();
+  }
+
+  private async watchAssistantAction(actionId: string, emit: (event: AgentStreamEvent) => void): Promise<void> {
+    if (this.assistantActionWatchers.has(actionId)) return;
+    this.assistantActionWatchers.add(actionId);
+    const runId = 'assistant';
+    try {
+      for (let i = 0; i < 420; i++) {
+        await wait(1500);
+        const action = await this.assistantActions.get(actionId);
+        if (!action) break;
+        if (action.status === 'completed') {
+          emit({ type: 'assistant', runId, text: action.message || 'Cliente creato correttamente.' });
+          await this.audit.write('assistant_action_completed', 'info', 'Assistant action completata', { actionId, action: action.action });
+          break;
+        }
+        if (action.status === 'cancelled') {
+          emit({ type: 'assistant', runId, text: 'Operazione annullata. Non ho creato nessun cliente.' });
+          await this.audit.write('assistant_action_cancelled', 'warning', 'Assistant action annullata', { actionId, action: action.action });
+          break;
+        }
+        if (action.status === 'expired') {
+          emit({ type: 'assistant', runId, text: 'Questa operazione preparata da Max è scaduta. Torna nella chat e riprova.' });
+          await this.audit.write('assistant_action_expired', 'warning', 'Assistant action scaduta', { actionId, action: action.action });
+          break;
+        }
+      }
+    } catch (error) {
+      await this.audit.write('assistant_action_watch_failed', 'error', errorMessage(error), { actionId });
+    } finally {
+      this.assistantActionWatchers.delete(actionId);
+    }
   }
 
   // --- Conversation history ---
@@ -577,4 +642,8 @@ function actionEvent(action: FileAction): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Errore imprevisto.';
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
