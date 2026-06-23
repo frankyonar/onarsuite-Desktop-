@@ -1,9 +1,9 @@
-import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, LocalFile, MaxDesktopApi, UpdateState } from '../../shared/types';
+﻿import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, LocalFile, MaxDesktopApi, UpdateState } from '../../shared/types';
 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.21', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.22', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', planName: 'PRO', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -35,7 +35,7 @@ const tree: Record<string, FsEntry[]> = {
 
 const fileText: Record<string, string> = {
   'preview/workspace/README.md': '# OnarSuite Workspace\n\nCartella di lavoro di Max.\n\n- preventivi/\n- contratto.html\n',
-  'preview/workspace/contratto.html': '<h1>Contratto di servizio</h1>\n<p>Tra le parti…</p>\n',
+  'preview/workspace/contratto.html': '<h1>Contratto di servizio</h1>\n<p>Tra le partiâ€¦</p>\n',
 };
 
 const updateState: UpdateState = { status: 'disabled', currentVersion: snapshot.appVersion };
@@ -76,24 +76,24 @@ export function createPreviewApi(): MaxDesktopApi {
     runAgent: async (input) => {
       const runId = 'preview';
       canceled = false;
-      emit({ type: 'status', runId, text: 'Max sta pensando…' });
+      emit({ type: 'status', runId, text: 'Max sta pensandoâ€¦' });
       await wait(700);
       if (canceled) return emit({ type: 'done', runId });
-      emit({ type: 'tool_start', runId, id: 't1', tool: 'list_dir', title: 'Elenco', command: 'list · workspace' });
+      emit({ type: 'tool_start', runId, id: 't1', tool: 'list_dir', title: 'Elenco', command: 'list Â· workspace' });
       await wait(600);
       emit({ type: 'tool_end', runId, id: 't1', ok: true, preview: 'FILE  README.md\nFILE  contratto.html\nDIR   preventivi' });
-      emit({ type: 'tool_start', runId, id: 't2', tool: 'read_file', title: 'Lettura', command: 'read · contratto.html' });
+      emit({ type: 'tool_start', runId, id: 't2', tool: 'read_file', title: 'Lettura', command: 'read Â· contratto.html' });
       await wait(700);
-      emit({ type: 'tool_end', runId, id: 't2', ok: true, preview: '<h1>Contratto di servizio</h1>\n<p>Tra le parti…</p>' });
-      emit({ type: 'assistant', runId, text: `Ho letto il contratto. Aggiorno l’intestazione e creo un task di follow-up.` });
-      emit({ type: 'tool_start', runId, id: 't3', tool: 'edit_file', title: 'Modifica', command: 'edit · contratto.html' });
+      emit({ type: 'tool_end', runId, id: 't2', ok: true, preview: '<h1>Contratto di servizio</h1>\n<p>Tra le partiâ€¦</p>' });
+      emit({ type: 'assistant', runId, text: `Ho letto il contratto. Aggiorno lâ€™intestazione e creo un task di follow-up.` });
+      emit({ type: 'tool_start', runId, id: 't3', tool: 'edit_file', title: 'Modifica', command: 'edit Â· contratto.html' });
       await wait(700);
-      emit({ type: 'tool_end', runId, id: 't3', ok: true, isDiff: true, preview: '- <h1>Contratto di servizio</h1>\n+ <h1>Contratto di servizio — OnarSuite</h1>' });
+      emit({ type: 'tool_end', runId, id: 't3', ok: true, isDiff: true, preview: '- <h1>Contratto di servizio</h1>\n+ <h1>Contratto di servizio â€” OnarSuite</h1>' });
       emit({ type: 'tool_start', runId, id: 't4', tool: 'onar_action', title: 'OnarSuite', command: 'create_user' });
       await wait(800);
-      emit({ type: 'tool_end', runId, id: 't4', ok: true, preview: "create_user · Utente 'Ferdinando Franzese' creato. Password temporanea: 7Kf9pQ2xL4mZ" });
+      emit({ type: 'tool_end', runId, id: 't4', ok: true, preview: "create_user Â· Utente 'Ferdinando Franzese' creato. Password temporanea: 7Kf9pQ2xL4mZ" });
       emit({ type: 'panel', runId, panel: { kind: 'customer', title: 'Ferdinando Franzese', subtitle: 'Utente creato. Password temporanea: 7Kf9pQ2xL4mZ', ok: true, fields: [{ label: 'Email', value: 'fra@example.com' }, { label: 'Ruolo (ID)', value: '126' }] } });
-      emit({ type: 'assistant', runId, text: `Fatto ✅\n\n- Letto il contratto e aggiornata l'intestazione\n- Creato l'utente Ferdinando Franzese in OnarSuite (ruolo Cliente)\n\nLa password temporanea è nel risultato qui sopra.` });
+      emit({ type: 'assistant', runId, text: `Fatto âœ…\n\n- Letto il contratto e aggiornata l'intestazione\n- Creato l'utente Ferdinando Franzese in OnarSuite (ruolo Cliente)\n\nLa password temporanea Ã¨ nel risultato qui sopra.` });
       emit({ type: 'done', runId });
       void input;
     },
@@ -135,3 +135,4 @@ export function createPreviewApi(): MaxDesktopApi {
     },
   };
 }
+

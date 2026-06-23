@@ -167,6 +167,9 @@ function langFor(filePath: string): string | undefined {
  *  worth a panel: a file Max read/wrote, or an object it created in OnarSuite). */
 function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: boolean; content: string }): PanelData | null {
   const str = (v: unknown) => (v === undefined || v === null ? '' : String(v));
+  const compact = (value: string, max = 240) => value.replace(/\s+/g, ' ').trim().slice(0, max);
+  const stripTags = (value: string) => value.replace(/<[^>]*>/g, ' ');
+  const looksLikeHtml = (value: string) => /<(?:h[1-6]|p|div|section|article|aside|ul|ol|li|table|thead|tbody|tr|td|th|br|strong|em|span|blockquote)\b/i.test(value);
 
   if (tool === 'read_file') {
     const p = str(args.path);
@@ -190,8 +193,22 @@ function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: b
     }
     if (/contract/.test(action)) {
       const fields: PanelField[] = [];
+      if (data.title) fields.push({ label: 'Titolo', value: str(data.title) });
+      if (data.client_name || data.client_email) fields.push({ label: 'Cliente', value: str(data.client_name || data.client_email) });
       if (data.amount) fields.push({ label: 'Importo', value: `${str(data.amount)} EUR` });
-      return { kind: 'contract', title: str(data.title) || 'Contratto', subtitle: result.content, ok: result.ok, fields, text: str(data.description) };
+      if (data.payment_terms) fields.push({ label: 'Termini', value: str(data.payment_terms) });
+      if (data.start_date || data.end_date) fields.push({ label: 'Periodo', value: [str(data.start_date), str(data.end_date)].filter(Boolean).join(' → ') });
+      const html = looksLikeHtml(result.content) ? result.content : undefined;
+      const summary = html ? compact(stripTags(result.content)) : compact(result.content);
+      return { kind: 'contract', title: str(data.title) || 'Contratto', subtitle: summary || undefined, ok: result.ok, fields, html, text: html ? undefined : result.content };
+    }
+    if (/reminder/.test(action)) {
+      const fields: PanelField[] = [];
+      if (data.name || data.title) fields.push({ label: 'Titolo', value: str(data.name ?? data.title) });
+      if (data.reminder_date) fields.push({ label: 'Data', value: str(data.reminder_date) });
+      if (data.send_time) fields.push({ label: 'Ora', value: str(data.send_time) });
+      if (data.priority) fields.push({ label: 'Priorita', value: str(data.priority) });
+      return { kind: 'reminder', title: str(data.name ?? data.title) || 'Promemoria', subtitle: compact(result.content), ok: result.ok, fields };
     }
     return { kind: 'result', title: action || 'OnarSuite', text: result.content, ok: result.ok };
   }

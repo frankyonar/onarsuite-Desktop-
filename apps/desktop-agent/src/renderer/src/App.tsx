@@ -519,7 +519,7 @@ function LockWeb({ serverUrl, nextPath, onHome }: { serverUrl: string; nextPath?
   </div>;
 }
 
-const PANEL_LABELS: Record<PanelData['kind'], string> = { customer: 'Cliente', contract: 'Contratto', file: 'File', table: 'Tabella', result: 'Risultato' };
+const PANEL_LABELS: Record<PanelData['kind'], string> = { customer: 'Cliente', contract: 'Contratto', reminder: 'Promemoria', file: 'File', table: 'Tabella', result: 'Risultato' };
 
 function greeting(name?: string): string {
   const h = new Date().getHours();
@@ -924,3 +924,6 @@ function errorText(error: unknown) {
   msg = msg.replace(/^OnarSuite ha risposto \d+:\s*/, '').trim();
   return msg || 'Si è verificato un errore.';
 }
+
+
+

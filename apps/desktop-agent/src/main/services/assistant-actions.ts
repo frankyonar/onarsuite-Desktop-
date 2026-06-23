@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+﻿import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { AssistantActionMode } from '../../shared/types';
 import type { AgentSdk } from './agent-sdk';
@@ -48,7 +48,7 @@ interface PendingActionState {
 const REGISTRY: Record<string, AssistantActionDefinition> = {
   'clients.create': {
     action: 'clients.create',
-    route: '/clients/create',
+    route: '/bookings/customers',
     mode: 'create',
     requiredFields: ['first_name', 'last_name', 'email'],
     optionalFields: ['phone', 'company', 'notes'],
@@ -59,7 +59,7 @@ const REGISTRY: Record<string, AssistantActionDefinition> = {
   },
   'clients.list': {
     action: 'clients.list',
-    route: '/clients',
+    route: '/bookings/customers',
     mode: 'view',
     requiredFields: [],
     optionalFields: [],
@@ -70,14 +70,25 @@ const REGISTRY: Record<string, AssistantActionDefinition> = {
   },
   'contracts.create': {
     action: 'contracts.create',
-    route: '/contracts/create',
+    route: '/onar-contracts/create',
     mode: 'create',
-    requiredFields: ['client', 'title', 'contract_type'],
-    optionalFields: ['amount', 'start_date', 'end_date', 'notes'],
+    requiredFields: ['title'],
+    optionalFields: ['client_name', 'client_email', 'amount', 'payment_terms', 'start_date', 'end_date', 'description', 'internal_notes'],
     confirmationRequired: true,
     dockTitle: 'Nuovo contratto',
     permissions: ['create-contracts'],
-    aliases: ['crea contratto', 'nuovo contratto'],
+    aliases: ['crea contratto', 'nuovo contratto', 'prepara contratto', 'bozza contratto'],
+  },
+  'reminders.create': {
+    action: 'reminders.create',
+    route: '/reminder',
+    mode: 'create',
+    requiredFields: ['name', 'reminder_date'],
+    optionalFields: ['send_time', 'description', 'priority', 'kind', 'client_id', 'channels'],
+    confirmationRequired: true,
+    dockTitle: 'Nuovo promemoria',
+    permissions: ['create-reminder'],
+    aliases: ['crea promemoria', 'nuovo promemoria', 'ricordami', 'metti promemoria'],
   },
   'calendar.open': {
     action: 'calendar.open',
@@ -145,7 +156,7 @@ export class AssistantActionOrchestrator {
     const pending = await this.readPending(key);
     if (pending && /(annulla|cancella|lascia perdere|stop|ferma)/i.test(text)) {
       await this.clearPending(key);
-      return { text: 'Operazione annullata. Non ho creato nessun cliente.' };
+      return { text: 'Operazione annullata. Non ho creato nulla.' };
     }
     const detected = detectIntent(text, pending);
     if (!detected) return null;
@@ -254,7 +265,11 @@ function detectIntent(message: string, pending?: PendingActionState): AssistantI
 
   const extractedFields = action === 'clients.create'
     ? extractClientFields(message, pending?.collectedFields)
-    : {};
+    : action === 'contracts.create'
+      ? extractContractFields(message, pending?.collectedFields)
+      : action === 'reminders.create'
+        ? extractReminderFields(message, pending?.collectedFields)
+        : {};
 
   const definition = REGISTRY[action];
   const merged = { ...(pending?.collectedFields ?? {}), ...extractedFields };
@@ -276,8 +291,10 @@ function findExplicitIntent(lowerMessage: string): string | undefined {
   for (const [action, definition] of Object.entries(REGISTRY)) {
     if (definition.aliases.some((alias) => lowerMessage.includes(alias))) return action;
   }
-  if (lowerMessage.includes('client') && /mostra|apri|vai|elenca|lista/.test(lowerMessage)) return 'clients.list';
-  if (lowerMessage.includes('cliente') && /crea|nuovo|aggiungi/.test(lowerMessage)) return 'clients.create';
+  if (/(cliente|clienti)/.test(lowerMessage) && /mostra|apri|vai|elenca|lista/.test(lowerMessage)) return 'clients.list';
+  if (/(cliente|clienti)/.test(lowerMessage) && /crea|nuovo|aggiungi/.test(lowerMessage)) return 'clients.create';
+  if (/(contratto|contratti|preventivo)/.test(lowerMessage) && /crea|nuovo|aggiungi|prepara/.test(lowerMessage)) return 'contracts.create';
+  if (/(promemoria|ricorda|ricordami|memo)/.test(lowerMessage) && /crea|nuovo|aggiungi|metti|fissa/.test(lowerMessage)) return 'reminders.create';
   return undefined;
 }
 
@@ -308,6 +325,65 @@ function extractClientFields(message: string, previous?: Record<string, string>)
   return extracted;
 }
 
+function extractContractFields(message: string, previous?: Record<string, string>): Record<string, string> {
+  const extracted: Record<string, string> = { ...(previous ?? {}) };
+  const title = extractAfterLabel(message, ['titolo', 'oggetto', 'subject', 'contratto']);
+  if (title) extracted.title = title;
+
+  const clientEmail = message.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
+  if (clientEmail) extracted.client_email = clientEmail.trim();
+
+  const clientName = extractAfterLabel(message, ['cliente', 'committente', 'destinatario']);
+  if (clientName) extracted.client_name = clientName;
+
+  const amount = message.match(/(?:â‚¬|eur|euro)\s*([0-9][0-9.,]*)|([0-9][0-9.,]*)\s*(?:â‚¬|eur|euro)/i);
+  if (amount) extracted.amount = normalizeAmount(amount[1] ?? amount[2]);
+
+  const paymentTerms = extractAfterLabel(message, ['termini di pagamento', 'pagamento', 'payment terms']);
+  if (paymentTerms) extracted.payment_terms = paymentTerms;
+
+  const dates = extractDates(message);
+  if (dates[0]) extracted.start_date = dates[0];
+  if (dates[1]) extracted.end_date = dates[1];
+
+  const description = extractAfterLabel(message, ['descrizione', 'oggetto', 'note']);
+  if (description) extracted.description = description;
+
+  const internalNotes = extractAfterLabel(message, ['note interne', 'interno', 'internal notes']);
+  if (internalNotes) extracted.internal_notes = internalNotes;
+
+  return extracted;
+}
+
+function extractReminderFields(message: string, previous?: Record<string, string>): Record<string, string> {
+  const extracted: Record<string, string> = { ...(previous ?? {}) };
+  const title = extractAfterLabel(message, ['titolo', 'promemoria', 'name', 'oggetto']);
+  if (title) extracted.name = title;
+
+  const dates = extractDates(message);
+  if (dates[0]) extracted.reminder_date = dates[0];
+
+  const time = message.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/)?.[0];
+  if (time) extracted.send_time = time;
+
+  const priority = message.match(/\b(low|medium|high|bassa|media|alta)\b/i)?.[0]?.toLowerCase();
+  if (priority) extracted.priority = priority === 'bassa' ? 'low' : priority === 'alta' ? 'high' : 'medium';
+
+  const kind = message.match(/\b(client|cliente|personal|personale|automation|automazione)\b/i)?.[0]?.toLowerCase();
+  if (kind) extracted.kind = kind === 'cliente' || kind === 'client' ? 'client' : kind === 'automazione' || kind === 'automation' ? 'automation' : 'personal';
+
+  const description = extractAfterLabel(message, ['descrizione', 'note', 'dettagli']);
+  if (description) extracted.description = description;
+
+  const clientId = message.match(/\bclient[_\s-]?id[:\s]*([0-9]+)\b/i)?.[1];
+  if (clientId) extracted.client_id = clientId;
+
+  const channels = extractChannels(message);
+  if (channels.length > 0) extracted.channels = channels.join(',');
+
+  return extracted;
+}
+
 function extractNameChunk(message: string, collected: Record<string, string>): string {
   let chunk = message;
   chunk = chunk.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, ' ');
@@ -334,19 +410,76 @@ function extractAfterLabel(message: string, labels: string[]): string | undefine
   return undefined;
 }
 
+function extractDates(message: string): string[] {
+  const matches = message.match(/\b(\d{4}-\d{2}-\d{2}|\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/g) ?? [];
+  return matches.map((value) => normalizeDate(value)).filter((value): value is string => Boolean(value));
+}
+
+function extractChannels(message: string): string[] {
+  const channels = new Set<string>();
+  if (/\bemail\b/i.test(message)) channels.add('email');
+  if (/\bsms\b/i.test(message)) channels.add('sms');
+  if (/\bwhatsapp\b/i.test(message)) channels.add('whatsapp');
+  return [...channels];
+}
+
+function normalizeDate(value: string): string | undefined {
+  const parts = value.includes('-') ? value.split('-') : value.split(/[\/.]/);
+  if (parts.length !== 3) return undefined;
+  if (value.includes('-') && parts[0].length === 4) {
+    return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+  }
+  const [a, b, c] = parts;
+  const year = c.length === 2 ? `20${c}` : c;
+  const day = a.padStart(2, '0');
+  const month = b.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeAmount(value: string): string {
+  const cleaned = value.replace(/\s/g, '').replace(',', '.');
+  return cleaned;
+}
+
 function normalizePhone(value: string): string {
   return value.replace(/[^\d+]/g, '').replace(/^\+?00/, '+');
 }
 
 function sanitizePrefill(action: string, fields: Record<string, string>): Record<string, unknown> {
-  if (action !== 'clients.create') return {};
   const prefill: Record<string, unknown> = {};
-  if (fields.first_name) prefill.first_name = fields.first_name.trim();
-  if (fields.last_name) prefill.last_name = fields.last_name.trim();
-  if (fields.email) prefill.email = fields.email.trim();
-  if (fields.phone) prefill.phone = fields.phone.trim();
-  if (fields.company) prefill.company = fields.company.trim();
-  if (fields.notes) prefill.notes = fields.notes.trim();
+  switch (action) {
+    case 'clients.create':
+      if (fields.first_name) prefill.first_name = fields.first_name.trim();
+      if (fields.last_name) prefill.last_name = fields.last_name.trim();
+      if (fields.email) prefill.email = fields.email.trim();
+      if (fields.phone) prefill.phone = fields.phone.trim();
+      if (fields.company) prefill.company = fields.company.trim();
+      if (fields.notes) prefill.notes = fields.notes.trim();
+      break;
+    case 'contracts.create':
+      if (fields.title) prefill.title = fields.title.trim();
+      if (fields.client_name) prefill.client_name = fields.client_name.trim();
+      if (fields.client_email) prefill.client_email = fields.client_email.trim();
+      if (fields.amount) prefill.amount = fields.amount.trim();
+      if (fields.payment_terms) prefill.payment_terms = fields.payment_terms.trim();
+      if (fields.start_date) prefill.start_date = fields.start_date.trim();
+      if (fields.end_date) prefill.end_date = fields.end_date.trim();
+      if (fields.description) prefill.description = fields.description.trim();
+      if (fields.internal_notes) prefill.internal_notes = fields.internal_notes.trim();
+      break;
+    case 'reminders.create':
+      if (fields.name) prefill.name = fields.name.trim();
+      if (fields.reminder_date) prefill.reminder_date = fields.reminder_date.trim();
+      if (fields.send_time) prefill.send_time = fields.send_time.trim();
+      if (fields.description) prefill.description = fields.description.trim();
+      if (fields.priority) prefill.priority = fields.priority.trim();
+      if (fields.kind) prefill.kind = fields.kind.trim();
+      if (fields.client_id) prefill.client_id = fields.client_id.trim();
+      if (fields.channels) prefill.channels = fields.channels.split(',').map((channel) => channel.trim()).filter(Boolean);
+      break;
+    default:
+      break;
+  }
   return prefill;
 }
 
@@ -363,6 +496,16 @@ function buildMissingFieldsPrompt(action: string, missingFields: string[]): stri
     const missingText = required.length > 0 ? `${joinItalian(required)}${optional ? '.' : ''}` : 'i dati mancanti.';
     return `Certo. Per creare il cliente mi servono ${missingText} ${optional}`.trim();
   }
+  if (action === 'contracts.create') {
+    if (missingFields.includes('title')) return 'Mi serve il titolo del contratto per prepararlo nel lock web.';
+    return 'Mi servono ancora alcuni dati per preparare il contratto.';
+  }
+  if (action === 'reminders.create') {
+    if (missingFields.includes('name') && missingFields.includes('reminder_date')) return 'Mi servono il titolo e la data del promemoria.';
+    if (missingFields.includes('name')) return 'Mi serve il titolo del promemoria.';
+    if (missingFields.includes('reminder_date')) return 'Mi serve la data del promemoria.';
+    return 'Mi servono ancora alcuni dati per preparare il promemoria.';
+  }
   if (action === 'clients.list') return 'Apro la lista clienti nel pannello laterale.';
   return 'Mi servono ancora alcuni dati per continuare.';
 }
@@ -370,6 +513,8 @@ function buildMissingFieldsPrompt(action: string, missingFields: string[]): stri
 function buildReadyMessage(action: string): string {
   if (action === 'clients.create') return 'Perfetto, preparo la scheda cliente nel pannello laterale. Controlla i dati e conferma la creazione.';
   if (action === 'clients.list') return 'Ho aperto i clienti nel pannello laterale.';
+  if (action === 'contracts.create') return 'Perfetto, preparo il contratto nel lock web.';
+  if (action === 'reminders.create') return 'Perfetto, preparo il promemoria nel lock web.';
   return 'Perfetto, preparo l\'operazione nel pannello laterale.';
 }
 
@@ -383,3 +528,4 @@ function joinItalian(items: string[]): string {
 function resolveOpenUrl(serverUrl: string, openUrl: string): string {
   return new URL(openUrl, serverUrl).toString();
 }
+

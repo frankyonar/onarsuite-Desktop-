@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.21';
+﻿export const APP_VERSION = '0.9.22';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -64,13 +64,14 @@ export interface AgentMessage {
 /** Structured preview shown in the right-hand panel when Max produces an object. */
 export interface PanelField { label: string; value: string; }
 export interface PanelData {
-  kind: 'customer' | 'contract' | 'file' | 'table' | 'result';
+  kind: 'customer' | 'contract' | 'reminder' | 'file' | 'table' | 'result';
   title: string;
   subtitle?: string;
   ok?: boolean;
   fields?: PanelField[];
   columns?: string[];
   rows?: string[][];
+  html?: string;
   text?: string;
   /** For file panels: the absolute path (enables Open / Reveal) and a code language. */
   path?: string;
@@ -264,3 +265,4 @@ export interface OnarResult {
   message: string;
   data?: unknown;
 }
+
