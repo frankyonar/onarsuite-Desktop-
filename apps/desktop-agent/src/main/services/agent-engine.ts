@@ -5,6 +5,25 @@ import type { AgentSdk } from './agent-sdk';
 import type { AgentTools } from './tools';
 
 const MAX_ITERATIONS = 25;
+const AUTO_MARKER_ACTIONS = new Set([
+  'web_search',
+  'web_fetch',
+  'library_search',
+  'library_read_file',
+  'contract_search',
+  'contract_summarize',
+  'list_reminders',
+  'list_users',
+  'list_leads',
+  'calendar_list_events',
+  'calendar_search_events',
+  'drive_list_items',
+  'drive_search_items',
+  'ai_email_list',
+  'ai_email_view_thread',
+  'ai_email_read_full',
+  'ai_email_search',
+]);
 
 const AGENT_SYSTEM = `Sei Max, un assistente AI autonomo in esecuzione dentro "Max Desktop" sul computer dell'utente.
 Lavori come un dipendente esperto che aiuta l'utente con OnarSuite e con i file locali.
@@ -81,10 +100,26 @@ export class AgentEngine {
         emit({ type: 'status', runId, text: i === 0 ? 'Max sta pensando…' : 'Max continua…' });
 
         const { message } = await this.sdk.agentStep(AGENT_SYSTEM, this.messages, toolDefs);
-        this.messages.push(message);
-
-        if (message.content && message.content.trim()) {
-          emit({ type: 'assistant', runId, text: message.content });
+        const structured = extractStructuredMarker(message.content ?? '');
+        this.messages.push({ ...message, content: structured.message || '' });
+        if (structured.message.trim()) {
+          emit({ type: 'assistant', runId, text: structured.message });
+        }
+        if (structured.action && AUTO_MARKER_ACTIONS.has(structured.action.type)) {
+          const args = { action_type: structured.action.type, data: structured.action.data ?? {} };
+          const autoId = randomUUID();
+          const title = 'OnarSuite';
+          emit({ type: 'tool_start', runId, id: autoId, tool: 'onar_action', title, command: structured.action.type });
+          let result;
+          try {
+            result = await this.tools.execute('onar_action', args);
+          } catch (error) {
+            result = { ok: false, content: errorText(error), preview: errorText(error) };
+          }
+          emit({ type: 'tool_end', runId, id: autoId, ok: result.ok, preview: result.preview, isDiff: result.isDiff });
+          const panel = buildPanel('onar_action', args, result);
+          if (panel) emit({ type: 'panel', runId, panel });
+          this.messages.push({ role: 'tool', tool_call_id: autoId, name: 'onar_action', content: result.content });
         }
 
         const calls = message.tool_calls ?? [];
@@ -165,11 +200,26 @@ function langFor(filePath: string): string | undefined {
 
 /** Turn a tool result into a structured right-panel preview (only the cases
  *  worth a panel: a file Max read/wrote, or an object it created in OnarSuite). */
-function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: boolean; content: string }): PanelData | null {
+function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: boolean; content: string; data?: unknown }): PanelData | null {
   const str = (v: unknown) => (v === undefined || v === null ? '' : String(v));
   const compact = (value: string, max = 240) => value.replace(/\s+/g, ' ').trim().slice(0, max);
   const stripTags = (value: string) => value.replace(/<[^>]*>/g, ' ');
   const looksLikeHtml = (value: string) => /<(?:h[1-6]|p|div|section|article|aside|ul|ol|li|table|thead|tbody|tr|td|th|br|strong|em|span|blockquote)\b/i.test(value);
+  const buildSearchLinks = (): Array<{ title: string; url: string; excerpt?: string; source?: string }> => {
+    const raw = result.data as { results?: Array<Record<string, unknown>>; answer?: unknown; data?: { results?: Array<Record<string, unknown>>; answer?: unknown } } | undefined;
+    const data = raw?.data && typeof raw.data === 'object' ? raw.data : raw;
+    const results = Array.isArray(data?.results) ? data.results : [];
+    const links: Array<{ title: string; url: string; excerpt?: string; source?: string }> = [];
+    for (const entry of results) {
+        const title = str(entry.title || entry.name || entry.url);
+        const url = str(entry.url || entry.link);
+        if (!url) continue;
+        const excerpt = compact(str(entry.content || entry.snippet || entry.description), 180) || undefined;
+        const source = str(entry.source || entry.domain || entry.site) || undefined;
+        links.push({ title: title || url, url, excerpt, source });
+    }
+    return links;
+  };
 
   if (tool === 'read_file') {
     const p = str(args.path);
@@ -202,6 +252,20 @@ function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: b
       const summary = html ? compact(stripTags(result.content)) : compact(result.content);
       return { kind: 'contract', title: str(data.title) || 'Contratto', subtitle: summary || undefined, ok: result.ok, fields, html, text: html ? undefined : result.content };
     }
+    if (action === 'web_search') {
+      const links = buildSearchLinks();
+      const raw = result.data as { answer?: unknown; data?: { answer?: unknown } } | undefined;
+      const answer = str(raw?.data?.answer ?? raw?.answer);
+      const summary = compact(answer || result.content, 320);
+      return {
+        kind: 'result',
+        title: str(data.query) || 'Risultati web',
+        subtitle: summary || undefined,
+        ok: result.ok,
+        links: links.length ? links : undefined,
+        text: links.length ? undefined : result.content,
+      };
+    }
     if (/reminder/.test(action)) {
       const fields: PanelField[] = [];
       if (data.name || data.title) fields.push({ label: 'Titolo', value: str(data.name ?? data.title) });
@@ -214,4 +278,31 @@ function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: b
   }
 
   return null;
+}
+
+function extractStructuredMarker(text: string): { message: string; action?: { type: string; data?: Record<string, unknown> }; navigate?: { url: string; label?: string } } {
+  const trimmed = text.trim();
+  if (!trimmed) return { message: '' };
+  const marker = /<{2,}\s*MAX\s*[_\- ]?\s*AI\s*>{2,}/i;
+  const match = marker.exec(trimmed);
+  if (!match) return { message: trimmed };
+  const message = trimmed.slice(0, match.index).trim();
+  const jsonText = trimmed.slice(match.index + match[0].length).trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '');
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(jsonText);
+  } catch {
+    decoded = undefined;
+  }
+  if (!decoded || typeof decoded !== 'object') return { message };
+  const value = decoded as Record<string, unknown>;
+  const action = value.action && typeof value.action === 'object' ? value.action as Record<string, unknown> : undefined;
+  const navigate = value.navigate && typeof value.navigate === 'object' ? value.navigate as Record<string, unknown> : undefined;
+  return {
+    message,
+    action: action && typeof action.type === 'string' ? { type: action.type, data: (action.data as Record<string, unknown>) ?? {} } : undefined,
+    navigate: navigate && typeof navigate.url === 'string' ? { url: navigate.url, label: typeof navigate.label === 'string' ? navigate.label : undefined } : undefined,
+  };
 }

@@ -27,6 +27,7 @@ export interface ToolResult {
   /** Short preview shown in the console UI. */
   preview: string;
   isDiff?: boolean;
+  data?: unknown;
 }
 
 /**
@@ -39,7 +40,7 @@ export class AgentTools {
     private readonly config: ConfigStore,
     private readonly audit: AuditLog,
     private readonly onarUpload: (filePath: string) => Promise<ActionResult>,
-    private readonly onarExecute: (actionType: string, data: Record<string, unknown>) => Promise<{ success: boolean; message: string }>,
+    private readonly onarExecute: (actionType: string, data: Record<string, unknown>) => Promise<{ success: boolean; message: string; data?: unknown }>,
   ) {}
 
   /** OpenAI-style tool schemas advertised to the model each step. */
@@ -234,7 +235,7 @@ export class AgentTools {
     try {
       const result = await this.onarExecute(actionType, data);
       await this.log('agent_onar_action', 'info', `Azione OnarSuite: ${actionType}`, { actionType, ok: result.success });
-      return { ok: result.success, content: result.message, preview: `${actionType} · ${result.message}` };
+      return { ok: result.success, content: result.message, preview: `${actionType} · ${result.message}`, data: result.data };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Azione OnarSuite fallita.';
       return { ok: false, content: message, preview: `${actionType} · errore` };

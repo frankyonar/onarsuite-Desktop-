@@ -63,6 +63,7 @@ export interface AgentMessage {
 
 /** Structured preview shown in the right-hand panel when Max produces an object. */
 export interface PanelField { label: string; value: string; }
+export interface PanelLink { title: string; url: string; excerpt?: string; source?: string; }
 export interface PanelData {
   kind: 'customer' | 'contract' | 'reminder' | 'file' | 'table' | 'result';
   title: string;
@@ -71,6 +72,7 @@ export interface PanelData {
   fields?: PanelField[];
   columns?: string[];
   rows?: string[][];
+  links?: PanelLink[];
   html?: string;
   text?: string;
   /** For file panels: the absolute path (enables Open / Reveal) and a code language. */
@@ -265,4 +267,3 @@ export interface OnarResult {
   message: string;
   data?: unknown;
 }
-

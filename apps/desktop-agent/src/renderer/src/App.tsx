@@ -276,7 +276,7 @@ export function App() {
       {view === 'logs' && <LogsView logs={logs} />}
       {view === 'settings' && <SettingsView snapshot={snapshot} busy={busy} onDisconnect={() => run(() => window.maxDesktop.disconnect())} onClear={() => run(() => window.maxDesktop.clearLocalData())} />}
     </main>
-    {dockView !== 'closed' && <WorkspaceDock view={dockView} tab={dockTab} snapshot={snapshot} files={files} logs={logs} serverUrl={snapshot.serverUrl} webPath={lockWebPath} outputs={outputs} selectedOutput={selectedOutput} onTab={openDockTab} onSelectOutput={setSelectedOutput} onRail={() => setDockView('rail')} onToggleExpand={() => setDockView((v) => (v === 'expanded' ? 'normal' : 'expanded'))} onClose={() => { setDockView('closed'); setLockWebPath(undefined); }} onResize={startLockResize} onAddFolder={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemoveFolder={(f) => run(() => window.maxDesktop.removeAuthorizedFolder(f))} onAnalyze={(f) => { setAttachments((a) => a.some((x) => x.path === f.path) ? a : a.concat(f)); setView('agent'); setNotice({ tone: 'success', text: `${f.name} pronto: scrivi a Max cosa farne.` }); }} onNotice={setNotice} />}
+    {dockView !== 'closed' && <WorkspaceDock view={dockView} tab={dockTab} snapshot={snapshot} files={files} logs={logs} serverUrl={snapshot.serverUrl} webPath={lockWebPath} outputs={outputs} selectedOutput={selectedOutput} onTab={openDockTab} onSelectOutput={setSelectedOutput} onRail={() => setDockView('rail')} onToggleExpand={() => setDockView((v) => (v === 'expanded' ? 'normal' : 'expanded'))} onClose={() => { setDockView('closed'); setLockWebPath(undefined); }} onResize={startLockResize} onAddFolder={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemoveFolder={(f) => run(() => window.maxDesktop.removeAuthorizedFolder(f))} onAnalyze={(f) => { setAttachments((a) => a.some((x) => x.path === f.path) ? a : a.concat(f)); setView('agent'); setNotice({ tone: 'success', text: `${f.name} pronto: scrivi a Max cosa farne.` }); }} onOpenLink={(url) => openWebDock(url)} onNotice={setNotice} />}
   </div>;
 }
 
@@ -466,7 +466,7 @@ function WorkspaceDock(props: {
   serverUrl: string; webPath?: string; outputs: PanelData[]; selectedOutput: number;
   onTab: (t: DockTab) => void; onSelectOutput: (i: number) => void;
   onRail: () => void; onToggleExpand: () => void; onClose: () => void; onResize: (e: ReactMouseEvent) => void;
-  onAddFolder: () => void; onRemoveFolder: (f: string) => void; onAnalyze: (f: LocalFile) => void; onNotice: (n: Notice) => void;
+  onAddFolder: () => void; onRemoveFolder: (f: string) => void; onAnalyze: (f: LocalFile) => void; onOpenLink: (url: string) => void; onNotice: (n: Notice) => void;
 }) {
   const { view, tab, snapshot, files, logs, serverUrl, webPath, outputs, selectedOutput } = props;
   if (view === 'rail') {
@@ -495,7 +495,7 @@ function WorkspaceDock(props: {
       {tab === 'contesto' && <DockContext snapshot={snapshot} files={files} />}
       {tab === 'file' && <DockFiles snapshot={snapshot} files={files} onAddFolder={props.onAddFolder} onRemoveFolder={props.onRemoveFolder} onAnalyze={props.onAnalyze} />}
       {tab === 'attivita' && <DockActivity logs={logs} />}
-      {tab === 'output' && <DockOutput outputs={outputs} selected={selectedOutput} onSelect={props.onSelectOutput} onNotice={props.onNotice} />}
+      {tab === 'output' && <DockOutput outputs={outputs} selected={selectedOutput} onSelect={props.onSelectOutput} onNotice={props.onNotice} onOpenLink={props.onOpenLink} />}
     </div>
   </aside>;
 }
@@ -562,16 +562,16 @@ function DockActivity({ logs }: { logs: AuditEntry[] }) {
   return <div className="dock-pane"><div className="dock-timeline">{logs.slice(0, 50).map((l) => <div key={l.id} className="dock-event"><span className={`dock-dot ${l.level}`} /><div className="dock-event-body"><strong>{l.message}</strong><small>{formatDate(l.createdAt)} · {l.eventType}</small></div></div>)}</div></div>;
 }
 
-function DockOutput({ outputs, selected, onSelect, onNotice }: { outputs: PanelData[]; selected: number; onSelect: (i: number) => void; onNotice: (n: Notice) => void }) {
+function DockOutput({ outputs, selected, onSelect, onNotice, onOpenLink }: { outputs: PanelData[]; selected: number; onSelect: (i: number) => void; onNotice: (n: Notice) => void; onOpenLink: (url: string) => void }) {
   if (!outputs.length) return <div className="dock-pane"><EmptyState icon="◆" title="Nessun output generato">Quando Max crea preventivi, PDF, documenti o codice, appariranno qui.</EmptyState></div>;
   const current = outputs[Math.min(selected, outputs.length - 1)];
   return <div className="dock-output">
     <div className="dock-output-list">{outputs.map((o, i) => <button key={i} className={i === selected ? 'active' : ''} onClick={() => onSelect(i)}><span className="dock-out-icon">{OUT_ICONS[o.kind] ?? '◆'}</span><span className="dock-out-title" title={o.title}>{o.title}</span></button>)}</div>
-    <div className="dock-output-view"><LockPreview panel={current} onNotice={onNotice} /></div>
+    <div className="dock-output-view"><LockPreview panel={current} onNotice={onNotice} onOpenLink={onOpenLink} /></div>
   </div>;
 }
 
-function LockPreview({ panel, onNotice }: { panel: PanelData; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void }) {
+function LockPreview({ panel, onNotice, onOpenLink }: { panel: PanelData; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void; onOpenLink: (url: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(panel.text ?? '');
   useEffect(() => { setText(panel.text ?? ''); setEditing(false); }, [panel]);
@@ -588,6 +588,16 @@ function LockPreview({ panel, onNotice }: { panel: PanelData; onNotice: (notice:
     {panel.subtitle && <p className="side-panel-sub">{panel.subtitle}</p>}
     {panel.fields && panel.fields.length > 0 && <dl className="side-panel-fields">{panel.fields.map((f) => <div key={f.label}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>}
     {panel.columns && panel.rows && <div className="side-panel-table"><div className="data-row head" style={{ gridTemplateColumns: panel.columns.map(() => 'minmax(0,1fr)').join(' ') }}>{panel.columns.map((c) => <span key={c}>{c}</span>)}</div>{panel.rows.map((row, i) => <div className="data-row" key={i} style={{ gridTemplateColumns: panel.columns!.map(() => 'minmax(0,1fr)').join(' ') }}>{row.map((cell, j) => <span key={j} title={cell}>{cell}</span>)}</div>)}</div>}
+    {panel.links && panel.links.length > 0 && <div className="result-carousel" role="list">
+      {panel.links.map((link) => (
+        <button key={link.url} type="button" className="result-card" onClick={() => onOpenLink(link.url)} title={link.url}>
+          <span className="result-card-domain">{link.source || hostFromUrl(link.url)}</span>
+          <strong className="result-card-title">{link.title}</strong>
+          {link.excerpt && <span className="result-card-excerpt">{link.excerpt}</span>}
+          <span className="result-card-arrow">Apri nel dock →</span>
+        </button>
+      ))}
+    </div>}
     {panel.kind === 'file' && panel.path && <div className="side-panel-actions">
       <button onClick={() => void window.maxDesktop.openFile(panel.path!)}>Apri</button>
       <button onClick={() => void window.maxDesktop.revealFile(panel.path!)}>Mostra cartella</button>
@@ -610,15 +620,12 @@ function LockWeb({ serverUrl, nextPath, onHome }: { serverUrl: string; nextPath?
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    void window.maxDesktop.webSessionUrl(nextPath)
-      .then((url) => {
-        if (!alive) return;
-        setSrc(url);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setSrc(serverUrl);
-      });
+    const load = async () => {
+      const target = nextPath?.trim();
+      if (target && /^https?:\/\//i.test(target)) return target;
+      return window.maxDesktop.webSessionUrl(target || undefined);
+    };
+    void load().then((url) => { if (alive) setSrc(url); }).catch(() => { if (alive) setSrc(serverUrl); });
     return () => { alive = false; };
   }, [nextPath, serverUrl]);
   useEffect(() => {
@@ -642,6 +649,10 @@ function LockWeb({ serverUrl, nextPath, onHome }: { serverUrl: string; nextPath?
 }
 
 const PANEL_LABELS: Record<PanelData['kind'], string> = { customer: 'Cliente', contract: 'Contratto', reminder: 'Promemoria', file: 'File', table: 'Tabella', result: 'Risultato' };
+
+function hostFromUrl(url: string): string {
+  try { return new URL(url).host.replace(/^www\./, ''); } catch { return url; }
+}
 
 function greeting(name?: string): string {
   const h = new Date().getHours();
