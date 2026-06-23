@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.19';
+export const APP_VERSION = '0.9.20';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
