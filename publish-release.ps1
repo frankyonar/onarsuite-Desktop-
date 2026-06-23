@@ -5,8 +5,8 @@
 
 $ErrorActionPreference = 'Stop'
 $null = Add-Type -AssemblyName System.Net.Http
-$repo    = 'frankyonar/Max-Desktop'
-$repoApi = 'https://api.github.com/repositories/1274401866'
+$repo    = 'frankyonar/onarsuite-Desktop-'
+$repoApi = 'https://api.github.com/repos/frankyonar/onarsuite-Desktop-'
 $appPkg  = Get-Content 'C:\Users\franc\Documents\Max Desktop\apps\desktop-agent\package.json' -Raw | ConvertFrom-Json
 $tag     = "v$($appPkg.version)"
 $assetDir = 'C:\Users\franc\Documents\Max Desktop\apps\desktop-agent\release'
@@ -92,7 +92,7 @@ $uploadBases = @()
 if ($release.upload_url) {
   $uploadBases += ($release.upload_url -replace '\{\?name,label\}$', '')
 }
-$uploadBases += "https://uploads.github.com/repositories/1274401866/releases/$($release.id)/assets"
+$uploadBases += "https://uploads.github.com/repos/frankyonar/onarsuite-Desktop-/releases/$($release.id)/assets"
 
 function Invoke-ReleaseUpload([string]$baseUrl, [string]$name, [string]$path) {
   $encodedName = [uri]::EscapeDataString($name)
