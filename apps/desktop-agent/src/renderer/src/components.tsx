@@ -75,7 +75,7 @@ export function EmptyState({ icon, title, children, action }: { icon: string; ti
   return <div className="empty-state"><span className="empty-icon">{icon}</span><h3>{title}</h3><p>{children}</p>{action}</div>;
 }
 
-const toolIcons: Record<ToolName, string> = {
+const toolIcons: Partial<Record<ToolName, string>> = {
   read_file: '▤', list_dir: '▸', search_files: '⌕', write_file: '✎', edit_file: '✎',
   create_file: '＋', delete_file: '⌫', run_shell: '❯', onar_action: '◆', onar_upload: '↥',
 };

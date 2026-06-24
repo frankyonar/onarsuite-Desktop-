@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.25';
+export const APP_VERSION = '0.9.26';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -50,7 +50,8 @@ export type ToolName =
   | 'delete_file'
   | 'run_shell'
   | 'onar_action'
-  | 'onar_upload';
+  | 'onar_upload'
+  | 'request_form';
 
 /** OpenAI-style message used inside the agent loop. */
 export interface AgentMessage {
@@ -88,6 +89,7 @@ export type AgentStreamEvent =
   | { type: 'tool_start'; runId: string; id: string; tool: ToolName; title: string; command: string }
   | { type: 'tool_end'; runId: string; id: string; ok: boolean; preview: string; isDiff?: boolean }
   | { type: 'panel'; runId: string; panel: PanelData }
+  | { type: 'form'; runId: string; action: string; title: string; prefill: Record<string, unknown> }
   | { type: 'done'; runId: string }
   | { type: 'error'; runId: string; message: string };
 
