@@ -79,7 +79,7 @@ export class AgentTools {
         cwd: { type: 'string', description: 'Cartella di lavoro (opzionale).' },
       }, ['command']),
       fn('onar_action', 'Esegui un\'azione REALE su OnarSuite (stesso potere del Max in-app). Usa SEMPRE questo per agire su OnarSuite, mai messaggi di testo speciali.', {
-        action_type: { type: 'string', description: 'Es: create_user {name,email,role_id,mobile_no?}, create_note {title,content}, create_reminder {title,date,description?}, create_contract {title,content,amount?}, create_ticket {subject,description}, create_product {name,price}, calendar_create_event {title,start,end}, drive_create_file {name,content}, library_search {query}, contract_search {query}, web_search {query}.' },
+        action_type: { type: 'string', description: 'Es: create_user {name,email,role_id,mobile_no?}, create_note {title,content}, create_reminder {title,date,description?}, create_contract {title,content,amount?}, create_ticket {subject,description}, create_product {name,price}, calendar_create_event {title,start,end}, drive_create_file {name,content}, library_search {query}, contract_search {query}, web_search {query}, news {topic?} (notizie verificate da Perplexity, topic vuoto = notizie di oggi).' },
         data: { type: 'object', description: 'Oggetto con i campi richiesti dall\'azione.' },
       }, ['action_type', 'data']),
       fn('onar_upload', 'Carica un file locale come allegato su OnarSuite.', {
@@ -100,6 +100,14 @@ export class AgentTools {
       case 'run_shell': return this.runShell(String(args.command ?? ''), args.cwd ? String(args.cwd) : undefined);
       case 'onar_action': return this.onarAction(String(args.action_type ?? ''), (args.data as Record<string, unknown>) ?? {});
       case 'onar_upload': return this.onarUploadFile(String(args.path ?? ''));
+      // Robustness: some models call an OnarSuite read-only action as a bare
+      // top-level tool instead of via onar_action. Delegate instead of failing.
+      case 'news':
+      case 'web_search':
+      case 'web_fetch':
+      case 'library_search':
+      case 'contract_search':
+        return this.onarAction(name, args);
       default: return { ok: false, content: `Strumento sconosciuto: ${name}`, preview: 'Strumento sconosciuto' };
     }
   }

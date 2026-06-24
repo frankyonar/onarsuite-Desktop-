@@ -8,6 +8,7 @@ const MAX_ITERATIONS = 25;
 const AUTO_MARKER_ACTIONS = new Set([
   'web_search',
   'web_fetch',
+  'news',
   'library_search',
   'library_read_file',
   'contract_search',
@@ -31,7 +32,8 @@ Lavori come un dipendente esperto che aiuta l'utente con OnarSuite e con i file 
 STRUMENTI (usa SOLO questi per agire — niente marcatori di testo):
 - File locali: read_file, list_dir, search_files, write_file, edit_file, create_file, delete_file (solo nelle cartelle autorizzate).
 - Shell: run_shell (npm, git, node, python, ecc.) con cwd in una cartella autorizzata.
-- OnarSuite: onar_action(action_type, data) esegue azioni REALI sul gestionale — create_user {name,email,role_id,mobile_no?}, create_note, create_reminder, create_contract, create_ticket, create_product, calendar_create_event, drive_create_file/drive_list_items, library_search, contract_search, web_search, e altre. onar_upload(path) carica un file.
+- OnarSuite: onar_action(action_type, data) esegue azioni REALI sul gestionale — create_user {name,email,role_id,mobile_no?}, create_note, create_reminder, create_contract, create_ticket, create_product, calendar_create_event, drive_create_file/drive_list_items, library_search, contract_search, web_search, news, e altre. onar_upload(path) carica un file.
+  Per le NOTIZIE usa onar_action('news', {topic?}) — fonti giornalistiche verificate (Perplexity). topic vuoto = notizie principali di oggi.
 
 GENERAZIONE FILE E CODICE:
 - Sai scrivere codice in qualsiasi linguaggio (Python, JS/TS, HTML/CSS, PHP, SQL, shell, ecc.) e generare documenti.
@@ -231,6 +233,12 @@ function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: b
     return { kind: 'file', title: p.split(/[\\/]/).pop() || p, subtitle: p, path: p, lang: langFor(p), text: str(args.content).slice(0, 8000), ok: true };
   }
 
+  // Some models call an OnarSuite read-only action as a bare top-level tool
+  // (e.g. `news`/`web_search`) instead of via onar_action. Render it the same.
+  if (tool !== 'onar_action' && AUTO_MARKER_ACTIONS.has(tool)) {
+    return buildPanel('onar_action', { action_type: tool, data: args }, result);
+  }
+
   if (tool === 'onar_action') {
     const action = str(args.action_type);
     const data = (args.data ?? {}) as Record<string, unknown>;
@@ -252,14 +260,15 @@ function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: b
       const summary = html ? compact(stripTags(result.content)) : compact(result.content);
       return { kind: 'contract', title: str(data.title) || 'Contratto', subtitle: summary || undefined, ok: result.ok, fields, html, text: html ? undefined : result.content };
     }
-    if (action === 'web_search') {
+    if (action === 'web_search' || action === 'news') {
       const links = buildSearchLinks();
       const raw = result.data as { answer?: unknown; data?: { answer?: unknown } } | undefined;
       const answer = str(raw?.data?.answer ?? raw?.answer);
       const summary = compact(answer || result.content, 320);
+      const fallbackTitle = action === 'news' ? 'Notizie' : 'Risultati web';
       return {
         kind: 'result',
-        title: str(data.query) || 'Risultati web',
+        title: str(data.query) || str(data.topic) || fallbackTitle,
         subtitle: summary || undefined,
         ok: result.ok,
         links: links.length ? links : undefined,
