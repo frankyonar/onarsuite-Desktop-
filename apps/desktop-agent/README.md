@@ -34,3 +34,11 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+## Aggiornamenti
+
+- L'app usa `electron-updater` con pubblicazione su GitHub Releases.
+- Quando esce una nuova release, compare un banner con il pulsante per scaricarla e riavviare
+  l'app in modo controllato.
+- Per ridurre i falsi positivi di SmartScreen/antivirus, firma il binario Windows con un
+  certificato di code signing prima della distribuzione pubblica.
