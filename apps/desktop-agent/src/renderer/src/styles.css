@@ -649,6 +649,29 @@ pre.side-panel-text { font-family: var(--font-mono); font-size: 11.5px; backgrou
 .dock-out-icon { font-size: 13px; }
 .dock-out-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dock-output-view { min-height: 0; overflow-y: auto; }
+.magic-form { display: grid; gap: 16px; margin-top: 16px; }
+.magic-fields { display: grid; gap: 13px; }
+.magic-fields label { display: grid; gap: 6px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.magic-fields label > span b { color: var(--err); }
+.magic-fields input:not([type="checkbox"]), .magic-fields textarea, .magic-fields select { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; outline: none; background: var(--glass-strong); color: var(--ink); font: 12.5px/1.45 var(--font-ui); }
+.magic-fields textarea { resize: vertical; min-height: 86px; }
+.magic-fields input:focus, .magic-fields textarea:focus, .magic-fields select:focus { border-color: var(--ring); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+.magic-fields small { color: var(--faint); font-size: 10.5px; font-weight: 400; line-height: 1.4; }
+.magic-check { grid-template-columns: 1fr auto; align-items: center; }
+.magic-check input { width: 18px; height: 18px; accent-color: var(--brand); }
+.magic-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+.magic-policy, .magic-danger { display: grid; gap: 4px; border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; background: var(--hover); font-size: 11px; line-height: 1.4; }
+.magic-policy span, .magic-danger span { color: var(--muted); }
+.magic-danger { border-color: rgba(239,68,68,.3); background: var(--err-bg); color: var(--err); }
+.magic-review { display: grid; gap: 12px; }
+.magic-review h4 { margin: 0; font-size: 14px; }
+.magic-review dl { display: grid; gap: 8px; margin: 0; }
+.magic-review dl > div { display: grid; grid-template-columns: minmax(90px,.7fr) 1.3fr; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border-soft); font-size: 12px; }
+.magic-review dt { color: var(--muted); }.magic-review dd { margin: 0; overflow-wrap: anywhere; }
+.magic-review p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.magic-complete { display: grid; justify-items: center; gap: 8px; margin-top: 22px; padding: 24px 16px; border-radius: 14px; background: var(--ok-bg); text-align: center; }
+.magic-complete > span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--ok); color: #fff; font-weight: 700; }
+.magic-complete p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .dots { display: inline-flex; gap: 4px; }
 .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); animation: bounce 1.2s infinite ease-in-out; }
 .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }

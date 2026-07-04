@@ -77,7 +77,7 @@ export function EmptyState({ icon, title, children, action }: { icon: string; ti
 
 const toolIcons: Partial<Record<ToolName, string>> = {
   read_file: '▤', list_dir: '▸', search_files: '⌕', write_file: '✎', edit_file: '✎',
-  create_file: '＋', delete_file: '⌫', run_shell: '❯', onar_action: '◆', onar_upload: '↥',
+  create_file: '＋', delete_file: '⌫', run_shell: '❯', onar_action: '◆', onar_upload: '↥', request_form: '✦',
 };
 
 /** A Claude-Code-style tool-call card: action, monospace command, status and an

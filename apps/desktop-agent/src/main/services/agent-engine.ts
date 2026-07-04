@@ -33,6 +33,7 @@ STRUMENTI (usa SOLO questi per agire — niente marcatori di testo):
 - File locali: read_file, list_dir, search_files, write_file, edit_file, create_file, delete_file (solo nelle cartelle autorizzate).
 - Shell: run_shell (npm, git, node, python, ecc.) con cwd in una cartella autorizzata.
 - OnarSuite: onar_action(action_type, data) esegue azioni REALI sul gestionale — create_user {name,email,role_id,mobile_no?}, create_note, create_reminder, create_contract, create_ticket, create_product, calendar_create_event, drive_create_file/drive_list_items, library_search, contract_search, web_search, news, e altre. onar_upload(path) carica un file.
+- Magic Panel: request_form(action, action_type, title, description, fields, prefill, confirmation_required) raccoglie dati strutturati e mostra una preview prima di un'azione reale. Usalo quando mancano più dati o l'utente deve verificare una scrittura.
   Per le NOTIZIE usa onar_action('news', {topic?}) — fonti giornalistiche verificate (Perplexity). topic vuoto = notizie principali di oggi.
 
 GENERAZIONE FILE E CODICE:
@@ -47,7 +48,7 @@ REGOLE TASSATIVE (la fiducia dell'utente dipende da queste):
 2. Per agire su OnarSuite usa SEMPRE il tool onar_action. NON scrivere mai marcatori tipo <<<MAXAI>>> né JSON di "navigate": l'app NON li esegue, sarebbe una bugia.
 3. Per conoscere il contenuto di un file LEGGILO con read_file (i PDF/DOCX vengono estratti). search_files cerca solo nei file di testo, NON nei PDF: per un PDF usa read_file. Non inventare mai contenuti o dati che non hai letto.
 4. Se uno strumento torna vuoto o "nessun risultato", DILLO chiaramente e chiedi indicazioni; non riempire i vuoti con supposizioni.
-5. Se ti manca un dato obbligatorio (es. email o role_id per create_user), chiedilo prima di chiamare il tool.
+5. Se mancano dati obbligatori per un'azione, usa request_form quando i campi sono più di uno; per una sola informazione semplice puoi chiederla in chat.
 6. Lavora in autonomia, ma riporta sempre l'esito REALE restituito dagli strumenti. Alla fine riassumi in italiano, conciso, solo ciò che è davvero accaduto.`;
 
 /**
@@ -180,6 +181,7 @@ function describe(tool: ToolName, args: Record<string, unknown>): { title: strin
     case 'run_shell': return { title: 'Shell', command: `run · ${String(args.command ?? '')}` };
     case 'onar_action': return { title: 'OnarSuite', command: `${String(args.action_type ?? 'azione')}` };
     case 'onar_upload': return { title: 'OnarSuite', command: `upload · ${base}` };
+    case 'request_form': return { title: 'Magic Panel', command: `form · ${String(args.title ?? args.action ?? 'dati')}` };
     default: return { title: 'Strumento', command: tool };
   }
 }
@@ -202,7 +204,7 @@ function langFor(filePath: string): string | undefined {
 
 /** Turn a tool result into a structured right-panel preview (only the cases
  *  worth a panel: a file Max read/wrote, or an object it created in OnarSuite). */
-function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: boolean; content: string; data?: unknown }): PanelData | null {
+export function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: boolean; content: string; data?: unknown }): PanelData | null {
   const str = (v: unknown) => (v === undefined || v === null ? '' : String(v));
   const compact = (value: string, max = 240) => value.replace(/\s+/g, ' ').trim().slice(0, max);
   const stripTags = (value: string) => value.replace(/<[^>]*>/g, ' ');
@@ -222,6 +224,17 @@ function buildPanel(tool: string, args: Record<string, unknown>, result: { ok: b
     }
     return links;
   };
+
+  if (tool === 'request_form' && result.ok) {
+    const data = (result.data ?? args) as Record<string, unknown>;
+    return {
+      kind: 'form', title: str(data.title) || 'Dati richiesti', subtitle: str(data.description) || undefined,
+      action: str(data.action), actionType: str(data.action_type),
+      schema: Array.isArray(data.fields) ? data.fields as NonNullable<PanelData['schema']> : [],
+      values: data.prefill && typeof data.prefill === 'object' ? data.prefill as Record<string, unknown> : {},
+      confirmationRequired: data.confirmation_required !== false, dangerous: Boolean(data.dangerous),
+    };
+  }
 
   if (tool === 'read_file') {
     const p = str(args.path);

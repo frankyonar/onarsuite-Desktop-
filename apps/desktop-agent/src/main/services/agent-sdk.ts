@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { APP_VERSION, type AgentMessage, type ChatMessage, type PairingInput, type PairingResponse } from '../../shared/types';
+import { APP_VERSION, type ActionDefinition, type AgentMessage, type ChatMessage, type PairingInput, type PairingResponse } from '../../shared/types';
 import type { AssistantActionMode } from '../../shared/types';
 
 export class AgentSdk {
@@ -42,6 +42,11 @@ export class AgentSdk {
 
   async getAssistantAction(actionId: string): Promise<{ action_id: string; action: string; route: string; mode: AssistantActionMode; status: string; prefill: Record<string, unknown>; dock_title?: string; expires_at?: string; opened_at?: string; completed_at?: string; cancelled_at?: string; message?: string }> {
     return this.request(`/api/assistant/actions/${encodeURIComponent(actionId)}`, {});
+  }
+
+  async getActionCatalog(): Promise<ActionDefinition[]> {
+    const result = await this.request<ActionDefinition[] | { actions: ActionDefinition[] }>('/api/assistant/actions/catalog', {});
+    return Array.isArray(result) ? result : result.actions;
   }
 
   async uploadArtifact(filePath: string, deviceId: string, idempotencyKey: string): Promise<unknown> {

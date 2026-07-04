@@ -369,6 +369,7 @@ export class DesktopRuntime {
     const assistantOutcome = await this.assistantActions.handleMessage(input.conversationId, message);
     if (assistantOutcome) {
       emit({ type: 'assistant', runId: 'assistant', text: assistantOutcome.text });
+      if (assistantOutcome.panel) emit({ type: 'form', runId: 'assistant', panel: assistantOutcome.panel });
       if (assistantOutcome.action) {
         emit({
           type: 'assistant_action',
@@ -544,10 +545,12 @@ export class DesktopRuntime {
     try {
       const result = await this.sdk.onarExecute(actionType, data);
       this.connection = 'connected';
+      await this.audit.write('onar_action_executed', result.success ? 'info' : 'warning', `Azione OnarSuite: ${actionType}`, { actionType, ok: result.success });
       return result;
     } catch (error) {
       if (error instanceof NetworkError) this.connection = 'offline';
       if (error instanceof RevokedDeviceError) this.connection = 'revoked';
+      await this.audit.write('onar_action_failed', 'error', `Azione OnarSuite fallita: ${actionType}`, { actionType });
       return { success: false, message: errorMessage(error) };
     }
   }

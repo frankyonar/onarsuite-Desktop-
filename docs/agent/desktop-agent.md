@@ -1,4 +1,4 @@
-# Max Desktop - guida tecnica
+# OnarSuite Desktop - Max e Magic Panel
 
 ## Installazione e avvio
 
@@ -20,6 +20,12 @@ Heartbeat e retry partono ogni 60 secondi. In assenza di rete le azioni vengono 
 
 Config, queue e audit sono salvati nella directory `userData/max-desktop` di Electron con permessi utente. Il log è JSONL e conserva solo metadati minimi.
 
-## UI
+## UI AI-first
 
-Schermate: pairing, panoramica, file workspace, cartelle autorizzate, registro e impostazioni. Upload e azioni OnarSuite mostrano sempre una conferma esplicita.
+La chat è l’ingresso principale. Il dock laterale è il Magic Panel e supporta webview autenticata, contesto, file, attività, output e form dinamici. I moduli sono presentati come Skills di Max; Max decide se usare chat, form nativo, file/output o una route web OnarSuite.
+
+## Action Catalog e form dinamici
+
+Il desktop prova a caricare `GET /api/assistant/actions/catalog` e usa il catalogo locale versionato quando l’endpoint non è disponibile. Ogni definizione contiene skill, modalità, route, action type, campi, permessi, conferma e tipo di risultato.
+
+Il tool agente `request_form` apre un form nel Magic Panel senza eseguire l’azione. Il renderer valida i campi obbligatori, mostra una preview quando `confirmationRequired` è attivo e solo dopo la conferma chiama `/api/agent/actions/execute`. Il backend verifica comunque token, account, piano e permessi ed è la fonte di verità.

@@ -85,6 +85,18 @@ export class AgentTools {
       fn('onar_upload', 'Carica un file locale come allegato su OnarSuite.', {
         path: filePath,
       }, ['path']),
+      fn('request_form', 'Apri un form dinamico nel Magic Panel per raccogliere o confermare dati strutturati. Non esegue ancora l\'azione.', {
+        action: { type: 'string', description: 'ID stabile del flusso, es. users.create.' },
+        action_type: { type: 'string', description: 'Azione backend da eseguire dopo conferma, es. create_user.' },
+        title: { type: 'string', description: 'Titolo chiaro del form.' },
+        description: { type: 'string', description: 'Breve spiegazione dell\'effetto.' },
+        fields: { type: 'array', description: 'Campi del form.', items: { type: 'object', properties: {
+          key: { type: 'string' }, label: { type: 'string' }, type: { type: 'string' }, required: { type: 'boolean' }, placeholder: { type: 'string' },
+        }, required: ['key', 'label'] } },
+        prefill: { type: 'object', description: 'Valori già raccolti.' },
+        confirmation_required: { type: 'boolean', description: 'Mostra una preview e richiede conferma prima dell\'esecuzione.' },
+        dangerous: { type: 'boolean', description: 'Evidenzia un\'azione distruttiva o sensibile.' },
+      }, ['action', 'action_type', 'title', 'fields']),
     ];
   }
 
@@ -100,6 +112,7 @@ export class AgentTools {
       case 'run_shell': return this.runShell(String(args.command ?? ''), args.cwd ? String(args.cwd) : undefined);
       case 'onar_action': return this.onarAction(String(args.action_type ?? ''), (args.data as Record<string, unknown>) ?? {});
       case 'onar_upload': return this.onarUploadFile(String(args.path ?? ''));
+      case 'request_form': return this.requestForm(args);
       // Robustness: some models call an OnarSuite read-only action as a bare
       // top-level tool instead of via onar_action. Delegate instead of failing.
       case 'news':
@@ -254,6 +267,15 @@ export class AgentTools {
     const target = await this.assertInside(p);
     const result = await this.onarUpload(target);
     return { ok: result.status === 'completed', content: result.message, preview: result.message };
+  }
+
+  private async requestForm(args: Record<string, unknown>): Promise<ToolResult> {
+    const fields = Array.isArray(args.fields) ? args.fields : [];
+    if (!String(args.action_type ?? '').trim() || !fields.length) {
+      return { ok: false, content: 'request_form richiede action_type e almeno un campo.', preview: 'Schema form non valido' };
+    }
+    await this.log('agent_form_requested', 'info', 'Form richiesto nel Magic Panel', { actionType: String(args.action_type) });
+    return { ok: true, content: 'Form aperto nel Magic Panel. Attendi l’input e la conferma dell’utente.', preview: `${String(args.title ?? 'Form')} · ${fields.length} campi`, data: args };
   }
 
   // --- path safety ----------------------------------------------------------

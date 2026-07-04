@@ -1,31 +1,37 @@
-# Max Desktop per OnarSuite
+# OnarSuite Desktop - Max e Magic Panel
 
-Versione 0.2.0 di un agente desktop locale e controllato per OnarSuite. L'app usa Electron, React e TypeScript e permette di parlare con Max, collegare un dispositivo, autorizzare cartelle, lavorare nella OnarSuite Workspace, analizzare documenti localmente e inviare azioni esplicite a OnarSuite.
+Versione 0.9.28 del guscio operativo AI-first di OnarSuite. La chat con Max è il punto di ingresso: Max può rispondere, leggere file autorizzati, aprire OnarSuite nel dock autenticato, mostrare output o raccogliere e confermare dati con form dinamici nel Magic Panel.
 
-## Avvio
+## Avvio e verifica
 
 Requisiti: Node.js 22+, npm 10+.
 
 ```powershell
 npm install
 npm run dev
-```
-
-Verifiche:
-
-```powershell
 npm run typecheck
 npm test
 npm run build
-npm --workspace @onarsuite/max-desktop run dist:win
 ```
 
-Il download del binario Electron richiede una catena TLS valida. In reti aziendali configurare la CA tramite `NODE_EXTRA_CA_CERTS`; non disabilitare la verifica TLS.
+Installer Windows:
 
-## Stato MVP
+```powershell
+cd apps/desktop-agent
+$env:NODE_OPTIONS='--use-system-ca'
+npx electron-builder --win nsis --x64
+```
 
-Implementati: avvio recuperabile con errori visibili, chat Max tramite `/api/max/desktop/chat`, UI desktop, pairing, heartbeat, workspace, cartelle autorizzate, parsing PDF/DOCX/XLSX/CSV/TXT/MD, upload, azioni bozza, audit locale, coda offline, retry e idempotenza.
+## Esperienza prodotto
 
-Il backend Agent Gateway non è ancora presente nel repository OnarSuite. Finché gli endpoint documentati non vengono aggiunti, pairing e azioni remote restituiscono un errore esplicito.
+- Chat first: l’utente descrive l’obiettivo senza dover conoscere il modulo.
+- Magic Panel: dock laterale per form, conferme, output, tabelle, file, attività e webview autenticata.
+- Action Catalog: il backend può fornire `/api/assistant/actions/catalog`; se non è disponibile, il desktop usa un fallback locale versionato.
+- Skills di Max: CRM, utenti, preventivi, contratti, promemoria e calendario sono capacità operative, non un menu ERP da navigare.
+- Sicurezza: file confinati a workspace e cartelle autorizzate; token protetti con `safeStorage`; azioni backend e modifiche locali registrate in audit.
 
-Vedi [docs/agent/desktop-agent.md](docs/agent/desktop-agent.md) per dettagli operativi.
+## Gateway OnarSuite
+
+Il desktop usa pairing, heartbeat, chat/agente, action execution, assistant actions, catalogo e artifact upload. Permessi, piano, scope e device token devono essere verificati dal backend, che resta la fonte di verità.
+
+Vedi [docs/agent/desktop-agent.md](docs/agent/desktop-agent.md) e [docs/agent/api.md](docs/agent/api.md).

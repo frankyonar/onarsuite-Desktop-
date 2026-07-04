@@ -1,20 +1,9 @@
 ﻿import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AssistantActionMode } from '../../shared/types';
+import type { ActionDefinition, AssistantActionMode, PanelData } from '../../shared/types';
+import { catalogById, LOCAL_ACTION_CATALOG, validCatalog } from './action-catalog';
 import type { AgentSdk } from './agent-sdk';
 import type { AuditLog } from './audit-log';
-
-export interface AssistantActionDefinition {
-  action: string;
-  route: string;
-  mode: AssistantActionMode;
-  requiredFields: string[];
-  optionalFields: string[];
-  confirmationRequired: boolean;
-  dockTitle: string;
-  permissions: string[];
-  aliases: string[];
-}
 
 export interface AssistantIntentResult {
   action: string;
@@ -37,6 +26,12 @@ export interface PreparedAssistantAction {
   prefill: Record<string, unknown>;
 }
 
+export interface AssistantOutcome {
+  text: string;
+  action?: PreparedAssistantAction;
+  panel?: PanelData;
+}
+
 interface PendingActionState {
   action: string;
   collectedFields: Record<string, string>;
@@ -45,99 +40,9 @@ interface PendingActionState {
   updatedAt: string;
 }
 
-const REGISTRY: Record<string, AssistantActionDefinition> = {
-  'clients.create': {
-    action: 'clients.create',
-    route: '/bookings/customers',
-    mode: 'create',
-    requiredFields: ['first_name', 'last_name', 'email'],
-    optionalFields: ['phone', 'company', 'notes'],
-    confirmationRequired: true,
-    dockTitle: 'Nuovo cliente',
-    permissions: ['create-booking-customers'],
-    aliases: ['crea cliente', 'nuovo cliente', 'aggiungi cliente', 'create customer'],
-  },
-  'clients.list': {
-    action: 'clients.list',
-    route: '/bookings/customers',
-    mode: 'view',
-    requiredFields: [],
-    optionalFields: [],
-    confirmationRequired: false,
-    dockTitle: 'Clienti',
-    permissions: ['manage-booking-customers'],
-    aliases: ['mostrami i clienti', 'apri clienti', 'vai ai clienti', 'elenca clienti', 'lista clienti'],
-  },
-  'contracts.create': {
-    action: 'contracts.create',
-    route: '/onar-contracts/create',
-    mode: 'create',
-    requiredFields: ['title'],
-    optionalFields: ['client_name', 'client_email', 'amount', 'payment_terms', 'start_date', 'end_date', 'description', 'internal_notes'],
-    confirmationRequired: true,
-    dockTitle: 'Nuovo contratto',
-    permissions: ['create-contracts'],
-    aliases: ['crea contratto', 'nuovo contratto', 'prepara contratto', 'bozza contratto'],
-  },
-  'reminders.create': {
-    action: 'reminders.create',
-    route: '/reminder',
-    mode: 'create',
-    requiredFields: ['name', 'reminder_date'],
-    optionalFields: ['send_time', 'description', 'priority', 'kind', 'client_id', 'channels'],
-    confirmationRequired: true,
-    dockTitle: 'Nuovo promemoria',
-    permissions: ['create-reminder'],
-    aliases: ['crea promemoria', 'nuovo promemoria', 'ricordami', 'metti promemoria'],
-  },
-  'calendar.open': {
-    action: 'calendar.open',
-    route: '/calendar',
-    mode: 'view',
-    requiredFields: [],
-    optionalFields: [],
-    confirmationRequired: false,
-    dockTitle: 'Calendario',
-    permissions: ['view-booking-appointments'],
-    aliases: ['apri calendario', 'mostrami calendario', 'vai al calendario'],
-  },
-  'calendar.create': {
-    action: 'calendar.create',
-    route: '/calendar/create',
-    mode: 'create',
-    requiredFields: ['title', 'date', 'start_time', 'end_time'],
-    optionalFields: ['client', 'location', 'description'],
-    confirmationRequired: true,
-    dockTitle: 'Nuovo appuntamento',
-    permissions: ['create-booking-appointments'],
-    aliases: ['nuovo appuntamento', 'crea appuntamento', 'metti appuntamento'],
-  },
-  'vouchers.create': {
-    action: 'vouchers.create',
-    route: '/vouchers/create',
-    mode: 'create',
-    requiredFields: ['recipient_name', 'service_description'],
-    optionalFields: ['sender_name', 'expiration_date', 'notes', 'price_hidden'],
-    confirmationRequired: true,
-    dockTitle: 'Nuovo voucher',
-    permissions: ['create-vouchers'],
-    aliases: ['crea voucher', 'voucher regalo'],
-  },
-  'quotes.create': {
-    action: 'quotes.create',
-    route: '/quotes/create',
-    mode: 'create',
-    requiredFields: ['client', 'title'],
-    optionalFields: ['items', 'amount', 'notes', 'attachments'],
-    confirmationRequired: true,
-    dockTitle: 'Nuovo preventivo',
-    permissions: ['create-sales-quotes'],
-    aliases: ['crea preventivo', 'nuovo preventivo'],
-  },
-};
-
 export class AssistantActionOrchestrator {
   private readonly stateFile: string;
+  private catalog?: ActionDefinition[];
 
   constructor(
     private readonly sdk: AgentSdk,
@@ -148,7 +53,7 @@ export class AssistantActionOrchestrator {
     this.stateFile = path.join(dataDirectory, 'assistant-actions.json');
   }
 
-  async handleMessage(conversationId: string | undefined, message: string): Promise<{ text: string; action?: PreparedAssistantAction } | null> {
+  async handleMessage(conversationId: string | undefined, message: string): Promise<AssistantOutcome | null> {
     const text = message.trim();
     if (!text) return null;
 
@@ -158,43 +63,42 @@ export class AssistantActionOrchestrator {
       await this.clearPending(key);
       return { text: 'Operazione annullata. Non ho creato nulla.' };
     }
-    const detected = detectIntent(text, pending);
+    const catalog = await this.getCatalog();
+    const registry = catalogById(catalog);
+    const detected = detectIntent(text, registry, pending);
     if (!detected) return null;
 
-    const action = REGISTRY[detected.action];
+    const action = registry[detected.action];
     if (!action) return null;
 
     const missingFields = action.requiredFields.filter((field) => !detected.extractedFields[field]);
     const collectedFields = { ...(pending?.collectedFields ?? {}), ...detected.extractedFields };
 
-    if (missingFields.length > 0) {
-      await this.writePending(key, {
-        action: detected.action,
-        collectedFields,
-        missingFields,
-        status: 'collecting_fields',
-        updatedAt: new Date().toISOString(),
-      });
-
-      return {
-        text: buildMissingFieldsPrompt(detected.action, missingFields),
-      };
-    }
-
     await this.clearPending(key);
 
     const payload = sanitizePrefill(detected.action, collectedFields);
+    if (action.mode !== 'view') {
+      return {
+        text: missingFields.length ? buildMissingFieldsPrompt(detected.action, missingFields) : buildReadyMessage(detected.action),
+        panel: {
+          kind: 'form', title: action.label, subtitle: action.description, action: action.id, actionType: action.actionType,
+          schema: action.fieldSchema, values: payload, permissions: action.permissions,
+          confirmationRequired: action.confirmationRequired, dangerous: action.dangerous,
+        },
+      };
+    }
+
     const serverUrl = await this.getServerUrl();
     const created = await this.sdk.createAssistantAction({
       action: detected.action,
-      route: action.route,
+      route: action.route ?? '/',
       mode: action.mode,
       prefill: payload,
     });
 
     await this.audit.write('assistant_action_created', 'info', 'Assistant action creata', {
       action: detected.action,
-      route: action.route,
+      route: action.route ?? '/',
       actionId: created.action_id,
     });
 
@@ -203,9 +107,9 @@ export class AssistantActionOrchestrator {
       action: {
         actionId: created.action_id,
         action: detected.action,
-        route: action.route,
+        route: action.route ?? '/',
         mode: action.mode,
-        title: action.dockTitle,
+        title: action.label,
         openUrl: resolveOpenUrl(serverUrl, created.open_url),
         prefill: payload,
       },
@@ -214,6 +118,18 @@ export class AssistantActionOrchestrator {
 
   async get(actionId: string) {
     return this.sdk.getAssistantAction(actionId);
+  }
+
+  private async getCatalog(): Promise<ActionDefinition[]> {
+    if (this.catalog) return this.catalog;
+    try {
+      this.catalog = validCatalog(await this.sdk.getActionCatalog()) ?? LOCAL_ACTION_CATALOG;
+      await this.audit.write('action_catalog_loaded', 'info', 'Catalogo azioni caricato', { source: this.catalog === LOCAL_ACTION_CATALOG ? 'local' : 'backend', count: this.catalog.length });
+    } catch {
+      this.catalog = LOCAL_ACTION_CATALOG;
+      await this.audit.write('action_catalog_loaded', 'warning', 'Catalogo backend non disponibile, uso fallback locale', { count: this.catalog.length });
+    }
+    return this.catalog;
   }
 
   private stateKey(conversationId?: string): string {
@@ -257,9 +173,9 @@ export class AssistantActionOrchestrator {
   }
 }
 
-function detectIntent(message: string, pending?: PendingActionState): AssistantIntentResult | null {
+export function detectIntent(message: string, registry = catalogById(), pending?: PendingActionState): AssistantIntentResult | null {
   const lower = message.toLowerCase();
-  const explicit = findExplicitIntent(lower);
+  const explicit = findExplicitIntent(lower, registry);
   const action = explicit || pending?.action;
   if (!action) return null;
 
@@ -271,15 +187,16 @@ function detectIntent(message: string, pending?: PendingActionState): AssistantI
         ? extractReminderFields(message, pending?.collectedFields)
         : {};
 
-  const definition = REGISTRY[action];
+  const definition = registry[action];
+  if (!definition) return null;
   const merged = { ...(pending?.collectedFields ?? {}), ...extractedFields };
   const missingFields = definition.requiredFields.filter((field) => !merged[field]);
 
   return {
     action,
-    route: definition.route,
+    route: definition.route ?? '/',
     mode: definition.mode,
-    dockTitle: definition.dockTitle,
+    dockTitle: definition.label,
     extractedFields: merged,
     missingFields,
     shouldOpenDock: missingFields.length === 0,
@@ -287,9 +204,9 @@ function detectIntent(message: string, pending?: PendingActionState): AssistantI
   };
 }
 
-function findExplicitIntent(lowerMessage: string): string | undefined {
-  for (const [action, definition] of Object.entries(REGISTRY)) {
-    if (definition.aliases.some((alias) => lowerMessage.includes(alias))) return action;
+function findExplicitIntent(lowerMessage: string, registry: Record<string, ActionDefinition>): string | undefined {
+  for (const [action, definition] of Object.entries(registry)) {
+    if ((definition.aliases ?? []).some((alias) => lowerMessage.includes(alias))) return action;
   }
   if (/(cliente|clienti)/.test(lowerMessage) && /mostra|apri|vai|elenca|lista/.test(lowerMessage)) return 'clients.list';
   if (/(cliente|clienti)/.test(lowerMessage) && /crea|nuovo|aggiungi/.test(lowerMessage)) return 'clients.create';
@@ -307,17 +224,7 @@ function extractClientFields(message: string, previous?: Record<string, string>)
   if (phone) extracted.phone = normalizePhone(phone);
 
   const nameChunk = extractNameChunk(message, extracted);
-  const parts = nameChunk.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    extracted.first_name = extracted.first_name || parts[0];
-    extracted.last_name = extracted.last_name || parts.slice(1).join(' ');
-  } else if (parts.length === 1) {
-    if (!extracted.first_name) extracted.first_name = parts[0];
-    else if (!extracted.last_name) extracted.last_name = parts[0];
-  }
-
-  const company = extractAfterLabel(message, ['azienda', 'company', 'ragione sociale']);
-  if (company) extracted.company = company;
+  if (nameChunk) extracted.name = extracted.name || nameChunk;
 
   const notes = extractAfterLabel(message, ['note', 'note:', 'nota', 'descrizione']);
   if (notes) extracted.notes = notes;
@@ -328,16 +235,16 @@ function extractClientFields(message: string, previous?: Record<string, string>)
 function extractContractFields(message: string, previous?: Record<string, string>): Record<string, string> {
   const extracted: Record<string, string> = { ...(previous ?? {}) };
   const title = extractAfterLabel(message, ['titolo', 'oggetto', 'subject', 'contratto']);
-  if (title) extracted.title = title;
+  if (title) extracted.subject = title;
 
   const clientEmail = message.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
   if (clientEmail) extracted.client_email = clientEmail.trim();
 
-  const clientName = extractAfterLabel(message, ['cliente', 'committente', 'destinatario']);
-  if (clientName) extracted.client_name = clientName;
+  const amount = message.match(/(?:€|eur|euro)\s*([0-9][0-9.,]*)|([0-9][0-9.,]*)\s*(?:€|eur|euro)/i);
+  if (amount) extracted.value = normalizeAmount(amount[1] ?? amount[2]);
 
-  const amount = message.match(/(?:â‚¬|eur|euro)\s*([0-9][0-9.,]*)|([0-9][0-9.,]*)\s*(?:â‚¬|eur|euro)/i);
-  if (amount) extracted.amount = normalizeAmount(amount[1] ?? amount[2]);
+  const typeName = extractAfterLabel(message, ['tipo contratto', 'template']);
+  if (typeName) extracted.type_name = typeName;
 
   const paymentTerms = extractAfterLabel(message, ['termini di pagamento', 'pagamento', 'payment terms']);
   if (paymentTerms) extracted.payment_terms = paymentTerms;
@@ -350,7 +257,7 @@ function extractContractFields(message: string, previous?: Record<string, string
   if (description) extracted.description = description;
 
   const internalNotes = extractAfterLabel(message, ['note interne', 'interno', 'internal notes']);
-  if (internalNotes) extracted.internal_notes = internalNotes;
+  if (internalNotes) extracted.notes = internalNotes;
 
   return extracted;
 }
@@ -392,9 +299,7 @@ function extractNameChunk(message: string, collected: Record<string, string>): s
   chunk = chunk.replace(/[:;,|]/g, ' ');
   chunk = chunk.replace(/\s+/g, ' ').trim();
 
-  if (!chunk && (collected.first_name || collected.last_name)) {
-    return [collected.first_name, collected.last_name].filter(Boolean).join(' ');
-  }
+  if (!chunk && collected.name) return collected.name;
 
   return chunk;
 }
@@ -449,23 +354,21 @@ function sanitizePrefill(action: string, fields: Record<string, string>): Record
   const prefill: Record<string, unknown> = {};
   switch (action) {
     case 'clients.create':
-      if (fields.first_name) prefill.first_name = fields.first_name.trim();
-      if (fields.last_name) prefill.last_name = fields.last_name.trim();
+      if (fields.name) prefill.name = fields.name.trim();
       if (fields.email) prefill.email = fields.email.trim();
       if (fields.phone) prefill.phone = fields.phone.trim();
-      if (fields.company) prefill.company = fields.company.trim();
       if (fields.notes) prefill.notes = fields.notes.trim();
       break;
     case 'contracts.create':
-      if (fields.title) prefill.title = fields.title.trim();
-      if (fields.client_name) prefill.client_name = fields.client_name.trim();
+      if (fields.subject) prefill.subject = fields.subject.trim();
       if (fields.client_email) prefill.client_email = fields.client_email.trim();
-      if (fields.amount) prefill.amount = fields.amount.trim();
+      if (fields.value) prefill.value = fields.value.trim();
+      if (fields.type_name) prefill.type_name = fields.type_name.trim();
       if (fields.payment_terms) prefill.payment_terms = fields.payment_terms.trim();
       if (fields.start_date) prefill.start_date = fields.start_date.trim();
       if (fields.end_date) prefill.end_date = fields.end_date.trim();
       if (fields.description) prefill.description = fields.description.trim();
-      if (fields.internal_notes) prefill.internal_notes = fields.internal_notes.trim();
+      if (fields.notes) prefill.notes = fields.notes.trim();
       break;
     case 'reminders.create':
       if (fields.name) prefill.name = fields.name.trim();
@@ -486,12 +389,11 @@ function sanitizePrefill(action: string, fields: Record<string, string>): Record
 function buildMissingFieldsPrompt(action: string, missingFields: string[]): string {
   if (action === 'clients.create') {
     const labels: Record<string, string> = {
-      first_name: 'nome',
-      last_name: 'cognome',
+      name: 'nome completo',
       email: 'email',
       phone: 'telefono',
     };
-    const required = missingFields.filter((field) => ['first_name', 'last_name', 'email'].includes(field)).map((field) => labels[field]).filter(Boolean);
+    const required = missingFields.filter((field) => ['name', 'email'].includes(field)).map((field) => labels[field]).filter(Boolean);
     const optional = missingFields.includes('phone') ? 'Puoi aggiungere anche il telefono.' : '';
     const missingText = required.length > 0 ? `${joinItalian(required)}${optional ? '.' : ''}` : 'i dati mancanti.';
     return `Certo. Per creare il cliente mi servono ${missingText} ${optional}`.trim();

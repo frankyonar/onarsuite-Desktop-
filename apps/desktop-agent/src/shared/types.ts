@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.27';
+export const APP_VERSION = '0.9.28';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -36,7 +36,7 @@ export const BLOCKED_SCOPES = [
 export type ConnectionState = 'connected' | 'offline' | 'not_paired' | 'revoked' | 'error';
 export type LogLevel = 'info' | 'warning' | 'error' | 'security';
 export type FileAction = 'upload' | 'create_task' | 'create_customer_draft' | 'create_quote_draft';
-export type AssistantActionMode = 'view' | 'create' | 'edit';
+export type AssistantActionMode = 'view' | 'create' | 'edit' | 'delete' | 'execute';
 export type AssistantActionStatus = 'pending' | 'opened' | 'completed' | 'cancelled' | 'expired';
 
 /** Local tools Max can call during an agent run. */
@@ -65,8 +65,35 @@ export interface AgentMessage {
 /** Structured preview shown in the right-hand panel when Max produces an object. */
 export interface PanelField { label: string; value: string; }
 export interface PanelLink { title: string; url: string; excerpt?: string; source?: string; }
+export type MagicFieldType = 'text' | 'email' | 'tel' | 'number' | 'date' | 'time' | 'datetime-local' | 'textarea' | 'select' | 'checkbox';
+export interface MagicField {
+  key: string;
+  label: string;
+  type?: MagicFieldType;
+  required?: boolean;
+  placeholder?: string;
+  description?: string;
+  options?: Array<{ label: string; value: string }>;
+}
+export interface ActionDefinition {
+  id: string;
+  label: string;
+  description: string;
+  skill: string;
+  mode: AssistantActionMode;
+  route?: string;
+  actionType: string;
+  requiredFields: string[];
+  optionalFields: string[];
+  fieldSchema: MagicField[];
+  permissions: string[];
+  confirmationRequired: boolean;
+  dangerous?: boolean;
+  resultPanelKind?: 'customer' | 'contract' | 'reminder' | 'file' | 'table' | 'result';
+  aliases?: string[];
+}
 export interface PanelData {
-  kind: 'customer' | 'contract' | 'reminder' | 'file' | 'table' | 'result';
+  kind: 'customer' | 'contract' | 'reminder' | 'file' | 'table' | 'result' | 'form' | 'confirmation' | 'html' | 'checklist';
   title: string;
   subtitle?: string;
   ok?: boolean;
@@ -79,6 +106,14 @@ export interface PanelData {
   /** For file panels: the absolute path (enables Open / Reveal) and a code language. */
   path?: string;
   lang?: string;
+  /** Dynamic Magic Panel form/action contract. */
+  action?: string;
+  actionType?: string;
+  schema?: MagicField[];
+  values?: Record<string, unknown>;
+  permissions?: string[];
+  confirmationRequired?: boolean;
+  dangerous?: boolean;
 }
 
 /** Events streamed from the agent loop (main) to the console (renderer). */
@@ -89,7 +124,7 @@ export type AgentStreamEvent =
   | { type: 'tool_start'; runId: string; id: string; tool: ToolName; title: string; command: string }
   | { type: 'tool_end'; runId: string; id: string; ok: boolean; preview: string; isDiff?: boolean }
   | { type: 'panel'; runId: string; panel: PanelData }
-  | { type: 'form'; runId: string; action: string; title: string; prefill: Record<string, unknown> }
+  | { type: 'form'; runId: string; panel: PanelData }
   | { type: 'done'; runId: string }
   | { type: 'error'; runId: string; message: string };
 

@@ -2,6 +2,7 @@
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import { AppLogo, BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard } from './components';
+import { ActionFormRenderer } from './MagicPanel';
 
 type View = 'onarsuite' | 'clients' | 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
 type Theme = 'light' | 'dark';
@@ -28,7 +29,7 @@ const navItems: Array<{ id: View; label: string; icon: string }> = [
 
 // Secondary "tools" - OnarSuite modules Max can also open, kept below the chat.
 const toolItems: Array<{ id: View; label: string; icon: string }> = [
-  { id: 'onarsuite', label: 'Moduli OnarSuite', icon: '◎' },
+  { id: 'onarsuite', label: 'Skills di Max', icon: '◎' },
   { id: 'clients', label: 'Clienti', icon: '◈' },
 ];
 
@@ -336,6 +337,7 @@ function AgentConsole({ convId, initialItems, onPersist, onPanel, onAssistantAct
       setItems((prev) => reduceEvent(prev, event));
       if (event.type === 'status') setStatus(event.text);
       if (event.type === 'panel') onPanel(event.panel);
+      if (event.type === 'form') onPanel(event.panel);
       if (event.type === 'assistant_action') onAssistantAction(event.openUrl);
       if (event.type === 'done' || event.type === 'error') { setRunning(false); setStatus(undefined); }
     });
@@ -457,7 +459,7 @@ const DOCK_TABS: Array<{ id: DockTab; label: string; icon: string }> = [
   { id: 'attivita', label: 'Attività', icon: '≡' },
   { id: 'output', label: 'Output', icon: '◆' },
 ];
-const OUT_ICONS: Record<PanelData['kind'], string> = { customer: '◉', contract: '▤', reminder: '⏰', file: '◇', table: '▦', result: '◆' };
+const OUT_ICONS: Record<PanelData['kind'], string> = { customer: '◉', contract: '▤', reminder: '⏰', file: '◇', table: '▦', result: '◆', form: '✦', confirmation: '✓', html: '◫', checklist: '☷' };
 
 /** The right "Workspace Dock": a Codex-style multi-tab side panel (web preview,
  *  Max context, files, activity, generated outputs). Resizable / rail / expanded. */
@@ -479,7 +481,7 @@ function WorkspaceDock(props: {
   return <aside className="dock">
     <div className="dock-resizer" onMouseDown={props.onResize} title="Trascina per ridimensionare" />
     <header className="dock-head">
-      <div className="dock-id"><strong>Workspace</strong><span>{tabLabel}</span></div>
+      <div className="dock-id"><strong>Magic Panel</strong><span>{tabLabel}</span></div>
       <DockStatus connection={snapshot.connection} />
       <div className="dock-tools">
         <button title="Espandi / riduci" aria-label="Espandi" onClick={props.onToggleExpand}>{view === 'expanded' ? '⤡' : '⤢'}</button>
@@ -495,7 +497,7 @@ function WorkspaceDock(props: {
       {tab === 'contesto' && <DockContext snapshot={snapshot} files={files} />}
       {tab === 'file' && <DockFiles snapshot={snapshot} files={files} onAddFolder={props.onAddFolder} onRemoveFolder={props.onRemoveFolder} onAnalyze={props.onAnalyze} />}
       {tab === 'attivita' && <DockActivity logs={logs} />}
-      {tab === 'output' && <DockOutput outputs={outputs} selected={selectedOutput} onSelect={props.onSelectOutput} onNotice={props.onNotice} onOpenLink={props.onOpenLink} />}
+      {tab === 'output' && <DockOutput outputs={outputs} selected={selectedOutput} onSelect={props.onSelectOutput} permissions={snapshot.permissions} onNotice={props.onNotice} onOpenLink={props.onOpenLink} />}
     </div>
   </aside>;
 }
@@ -562,16 +564,16 @@ function DockActivity({ logs }: { logs: AuditEntry[] }) {
   return <div className="dock-pane"><div className="dock-timeline">{logs.slice(0, 50).map((l) => <div key={l.id} className="dock-event"><span className={`dock-dot ${l.level}`} /><div className="dock-event-body"><strong>{l.message}</strong><small>{formatDate(l.createdAt)} · {l.eventType}</small></div></div>)}</div></div>;
 }
 
-function DockOutput({ outputs, selected, onSelect, onNotice, onOpenLink }: { outputs: PanelData[]; selected: number; onSelect: (i: number) => void; onNotice: (n: Notice) => void; onOpenLink: (url: string) => void }) {
+function DockOutput({ outputs, selected, onSelect, permissions, onNotice, onOpenLink }: { outputs: PanelData[]; selected: number; onSelect: (i: number) => void; permissions: string[]; onNotice: (n: Notice) => void; onOpenLink: (url: string) => void }) {
   if (!outputs.length) return <div className="dock-pane"><EmptyState icon="◆" title="Nessun output generato">Quando Max crea preventivi, PDF, documenti o codice, appariranno qui.</EmptyState></div>;
   const current = outputs[Math.min(selected, outputs.length - 1)];
   return <div className="dock-output">
     <div className="dock-output-list">{outputs.map((o, i) => <button key={i} className={i === selected ? 'active' : ''} onClick={() => onSelect(i)}><span className="dock-out-icon">{OUT_ICONS[o.kind] ?? '◆'}</span><span className="dock-out-title" title={o.title}>{o.title}</span></button>)}</div>
-    <div className="dock-output-view"><LockPreview panel={current} onNotice={onNotice} onOpenLink={onOpenLink} /></div>
+    <div className="dock-output-view"><LockPreview panel={current} permissions={permissions} onNotice={onNotice} onOpenLink={onOpenLink} /></div>
   </div>;
 }
 
-function LockPreview({ panel, onNotice, onOpenLink }: { panel: PanelData; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void; onOpenLink: (url: string) => void }) {
+function LockPreview({ panel, permissions, onNotice, onOpenLink }: { panel: PanelData; permissions: string[]; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void; onOpenLink: (url: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(panel.text ?? '');
   useEffect(() => { setText(panel.text ?? ''); setEditing(false); }, [panel]);
@@ -586,6 +588,7 @@ function LockPreview({ panel, onNotice, onOpenLink }: { panel: PanelData; onNoti
     <span className="side-panel-kind">{PANEL_LABELS[panel.kind]}</span>
     <div className="side-panel-title"><strong>{panel.title}</strong>{panel.ok !== undefined && <span className={`pill ${panel.ok ? 'ok' : 'err'}`}>{panel.ok ? '✓' : '✗'}</span>}</div>
     {panel.subtitle && <p className="side-panel-sub">{panel.subtitle}</p>}
+    {panel.kind === 'form' && <ActionFormRenderer panel={panel} grantedPermissions={permissions} onNotice={onNotice} />}
     {panel.fields && panel.fields.length > 0 && <dl className="side-panel-fields">{panel.fields.map((f) => <div key={f.label}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>}
     {panel.columns && panel.rows && <div className="side-panel-table"><div className="data-row head" style={{ gridTemplateColumns: panel.columns.map(() => 'minmax(0,1fr)').join(' ') }}>{panel.columns.map((c) => <span key={c}>{c}</span>)}</div>{panel.rows.map((row, i) => <div className="data-row" key={i} style={{ gridTemplateColumns: panel.columns!.map(() => 'minmax(0,1fr)').join(' ') }}>{row.map((cell, j) => <span key={j} title={cell}>{cell}</span>)}</div>)}</div>}
     {panel.links && panel.links.length > 0 && <div className="result-carousel" role="list">
@@ -648,7 +651,7 @@ function LockWeb({ serverUrl, nextPath, onHome }: { serverUrl: string; nextPath?
   </div>;
 }
 
-const PANEL_LABELS: Record<PanelData['kind'], string> = { customer: 'Cliente', contract: 'Contratto', reminder: 'Promemoria', file: 'File', table: 'Tabella', result: 'Risultato' };
+const PANEL_LABELS: Record<PanelData['kind'], string> = { customer: 'Cliente', contract: 'Contratto', reminder: 'Promemoria', file: 'File', table: 'Tabella', result: 'Risultato', form: 'Magic Form', confirmation: 'Conferma', html: 'HTML', checklist: 'Procedura' };
 
 function hostFromUrl(url: string): string {
   try { return new URL(url).host.replace(/^www\./, ''); } catch { return url; }
@@ -732,7 +735,7 @@ function OnarHome({ onNotice, onGoClients }: { onNotice: (n: Notice) => void; on
   const def = MODULES.find((m) => m.id === moduleId);
   if (def) return <ModuleScreen def={def} onBack={() => setModuleId(undefined)} onNotice={onNotice} />;
   return <div className="onar-home">
-    <Card className="onar-banner"><div><span className="eyebrow">GESTIONALE NATIVO</span><h2>OnarSuite Desktop è autonomo</h2><p>Qui lavoriamo solo con schermate native, dati reali e azioni verso il backend. Nessun salto al web: costruiamo i moduli dentro l'app.</p><div className="hero-actions"><Button onClick={onGoClients}>Apri Clienti</Button></div></div></Card>
+    <Card className="onar-banner"><div><span className="eyebrow">SKILLS DI MAX</span><h2>Max sceglie il formato più adatto.</h2><p>Chat, form nativi, file e pagine OnarSuite autenticate lavorano insieme nel Magic Panel. Parti dall’obiettivo: Max apre lo strumento giusto.</p><div className="hero-actions"><Button onClick={onGoClients}>Apri Clienti</Button></div></div></Card>
     <div className="module-grid">
       {MODULES.map((m) => <button key={m.id} className="module-card" onClick={() => setModuleId(m.id)}><span className="module-icon">{m.icon}</span><strong>{m.label}</strong><small>{m.hint}</small></button>)}
       {COMING.map((m) => <div key={m.label} className="module-card disabled"><span className="module-icon">{m.icon}</span><strong>{m.label}</strong><small>{m.hint}</small><span className="soon">in arrivo</span></div>)}
@@ -1038,7 +1041,7 @@ function ClientsView() {
   );
 }
 
-const viewTitles: Record<View, string> = { onarsuite: 'OnarSuite', clients: 'Clienti', agent: 'Agente Max', explorer: 'Esplora file', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
+const viewTitles: Record<View, string> = { onarsuite: 'Skills di Max', clients: 'Clienti', agent: 'Agente Max', explorer: 'Esplora file', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
 function iconFor(ext?: string) { if (!ext) return '▢'; if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return '▤'; if (['xlsx', 'csv'].includes(ext)) return '▦'; if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) return '▣'; return '◇'; }
 function shortPath(value: string) { const parts = value.split(/[\\/]/); return parts.length > 3 ? `…/${parts.slice(-3).join('/')}` : value; }
 function formatBytes(value: number) { if (value < 1024) return `${value} B`; if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`; return `${(value / 1024 ** 2).toFixed(1)} MB`; }
