@@ -3,6 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, ConsoleItem, Conversati
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import { AppLogo, BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard } from './components';
 import { ActionFormRenderer } from './MagicPanel';
+import { getUpdatePresentation } from './update-ui';
 
 type View = 'onarsuite' | 'clients' | 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
 type Theme = 'light' | 'dark';
@@ -178,7 +179,6 @@ export function App() {
     void window.maxDesktop.getUpdateState()
       .then((state) => { if (active) setUpdateState(state); })
       .catch(() => undefined);
-    void window.maxDesktop.checkForUpdates().catch(() => undefined);
     const unsubscribe = window.maxDesktop.onUpdateStateChanged((state) => setUpdateState(state));
     return () => {
       active = false;
@@ -890,47 +890,28 @@ function UpdateBanner({ state, busy, onAction }: { state: UpdateState; busy: boo
   if (state.status === 'disabled' || state.status === 'idle') return null;
 
   const percent = Math.max(0, Math.min(100, state.percent ?? 0));
-  const title = state.status === 'available'
-    ? `Nuova versione ${state.availableVersion ?? ''} disponibile`
-    : state.status === 'downloading'
-      ? `Scaricamento aggiornamento ${state.availableVersion ?? ''}`
-      : state.status === 'downloaded'
-        ? `Aggiornamento ${state.availableVersion ?? ''} pronto`
-        : state.status === 'checking'
-          ? 'Controllo aggiornamenti in corso'
-          : 'Aggiornamento non riuscito';
-  const message = state.status === 'available'
-    ? "Scarica l'update e riavvia l'app quando sei pronto."
-    : state.status === 'downloading'
-      ? `Download in corso${state.totalBytes ? ` · ${percent}%` : ''}`
-      : state.status === 'downloaded'
-        ? 'Riavvia per installare la nuova release.'
-        : state.error || 'Riprova il controllo degli aggiornamenti.';
-  const buttonLabel = state.status === 'downloaded'
-    ? 'Riavvia e installa'
-    : state.status === 'downloading'
-      ? 'Scaricamento...'
-      : state.status === 'checking'
-        ? 'Controllo...'
-        : state.status === 'error'
-          ? 'Riprova'
-          : 'Scarica aggiornamento';
+  const presentation = getUpdatePresentation(state);
 
   return (
-    <div className={`update-banner update-${state.status}`}>
+    <div className={`update-banner update-${state.status}`} role="status" aria-live="polite">
+      <div className="update-banner-icon" aria-hidden="true">
+        {state.status === 'downloaded' ? '✓' : state.status === 'error' ? '!' : '↓'}
+      </div>
       <div className="update-banner-copy">
-        <span className="eyebrow">AGGIORNAMENTO DISPONIBILE</span>
-        <strong>{title}</strong>
-        <span>{message}</span>
+        <span className="eyebrow">AGGIORNAMENTO APP</span>
+        <strong>{presentation.title}</strong>
+        <span>{presentation.message}</span>
         {state.status === 'downloading' && (
-          <div className="update-progress" aria-hidden="true">
+          <div className="update-progress" role="progressbar" aria-label="Download aggiornamento" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
             <div style={{ width: `${percent}%` }} />
           </div>
         )}
       </div>
-      <Button variant={state.status === 'downloaded' ? 'primary' : 'secondary'} disabled={busy || state.status === 'checking' || state.status === 'downloading'} onClick={onAction}>
-        {buttonLabel}
-      </Button>
+      {presentation.buttonLabel && (
+        <Button variant={state.status === 'downloaded' ? 'primary' : 'secondary'} disabled={busy} onClick={onAction}>
+          {busy ? 'Attendi…' : presentation.buttonLabel}
+        </Button>
+      )}
     </div>
   );
 }

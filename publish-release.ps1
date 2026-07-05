@@ -40,8 +40,8 @@ $token = $line.ToString().Substring(9)
 $bodyText = @"
 OnarSuite $($appPkg.version)
 
-- Aggiornamenti automatici via GitHub Releases con pulsante in-app.
-- Il client controlla le nuove release, scarica l'installer e riavvia l'app.
+- Controllo periodico silenzioso e download automatico in background.
+- Avanzamento visibile senza interrompere il lavoro e riavvio esplicito quando la release è pronta.
 
 Nota: per ridurre davvero i falsi positivi di SmartScreen/antivirus, firma il
 binario Windows con un certificato di code signing prima della distribuzione

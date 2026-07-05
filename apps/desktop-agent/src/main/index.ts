@@ -151,7 +151,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     registerIpc();
     createWindow();
-    void updateService.checkForUpdates();
+    updateService.startBackgroundChecks();
     try {
       await runtime.initialize();
     } catch (error) {
@@ -169,6 +169,7 @@ if (!app.requestSingleInstanceLock()) {
 
 app.on('before-quit', () => {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
+  updateService.stopBackgroundChecks();
 });
 
 app.on('window-all-closed', () => {
