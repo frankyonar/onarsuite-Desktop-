@@ -1,6 +1,6 @@
 # OnarSuite Desktop - Max e Magic Panel
 
-Versione 0.9.28 del guscio operativo AI-first di OnarSuite. La chat con Max è il punto di ingresso: Max può rispondere, leggere file autorizzati, aprire OnarSuite nel dock autenticato, mostrare output o raccogliere e confermare dati con form dinamici nel Magic Panel.
+Versione 0.9.29 del guscio operativo AI-first di OnarSuite. La chat con Max è il punto di ingresso: Max può rispondere, leggere file autorizzati, aprire OnarSuite nel dock autenticato, mostrare output o raccogliere e confermare dati con form dinamici nel Magic Panel.
 
 ## Avvio e verifica
 

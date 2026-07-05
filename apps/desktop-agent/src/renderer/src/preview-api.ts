@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.28', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.29', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', planName: 'PRO', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -79,6 +79,33 @@ export function createPreviewApi(): MaxDesktopApi {
       emit({ type: 'status', runId, text: 'Max sta pensandoâ€¦' });
       await wait(700);
       if (canceled) return emit({ type: 'done', runId });
+      if (/utent|collaborator/i.test(input.message)) {
+        const panel = {
+          kind: 'form' as const,
+          title: 'Crea nuovo utente',
+          subtitle: 'Inserisci i dati del collaboratore. Potrai controllarli prima della creazione.',
+          action: 'users.create',
+          actionType: 'create_user',
+          confirmationRequired: true,
+          permissions: ['create-user'],
+          values: { role_id: '163' },
+          schema: [
+            { key: 'name', label: 'Nome completo', required: true, placeholder: 'Inserisci il nome completo' },
+            { key: 'email', label: 'Email', type: 'email' as const, required: true, placeholder: 'nome@azienda.it' },
+            { key: 'role_id', label: 'Ruolo', type: 'select' as const, required: true, options: [
+              { label: 'Staff', value: '162' }, { label: 'Client', value: '163' }, { label: 'Vendor', value: '164' }, { label: 'HR', value: '165' },
+            ] },
+            { key: 'mobile_no', label: 'Telefono', type: 'tel' as const, placeholder: '+39 333 000 0000' },
+          ],
+        };
+        emit({ type: 'tool_start', runId, id: 'form-user', tool: 'request_form', title: 'Magic Panel', command: 'form · Crea nuovo utente' });
+        await wait(500);
+        emit({ type: 'tool_end', runId, id: 'form-user', ok: true, preview: 'Crea nuovo utente · 4 campi' });
+        emit({ type: 'form', runId, panel });
+        emit({ type: 'assistant', runId, text: 'Ho aperto il form per creare un nuovo utente. Compila i dati e controllali nel Magic Panel prima di confermare.' });
+        emit({ type: 'done', runId });
+        return;
+      }
       emit({ type: 'tool_start', runId, id: 't1', tool: 'list_dir', title: 'Elenco', command: 'list Â· workspace' });
       await wait(600);
       emit({ type: 'tool_end', runId, id: 't1', ok: true, preview: 'FILE  README.md\nFILE  contratto.html\nDIR   preventivi' });

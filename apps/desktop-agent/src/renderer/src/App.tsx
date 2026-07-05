@@ -105,8 +105,9 @@ export function App() {
       setSelectedOutput(next.length - 1);
       return next;
     });
+    if (p.kind === 'form') setLockWidth((width) => Math.max(width, 420));
     setDockTab('output');
-    setDockView((v) => (v === 'closed' ? 'normal' : v));
+    setDockView((view) => (view === 'expanded' ? view : 'normal'));
   }, []);
   const openWebDock = useCallback((nextPath?: string) => {
     setLockWebPath(nextPath);
@@ -222,7 +223,7 @@ export function App() {
   const dockW = dockView === 'closed' ? 0 : dockView === 'rail' ? 52 : dockView === 'expanded' ? Math.max(420, Math.min(Math.round(winW * 0.62), winW - sidebarWidth - 380)) : lockWidth;
   return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)${dockView !== 'closed' ? ` ${dockW}px` : ''}` }}>
     <aside className="sidebar">
-      <div className="brand"><AppLogo theme={theme} planName={snapshot.planName} /></div>
+      <div className="brand"><AppLogo theme="dark" planName={snapshot.planName} /></div>
       <button className="new-chat" onClick={() => void newChat()}><span>+</span>Nuova chat</button>
       <nav>{navItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}</nav>
       <div className="conv-section">
@@ -258,6 +259,10 @@ export function App() {
         <div className="topbar-title">{viewTitles[view]}</div>
         <div className="topbar-actions">
           {snapshot.pendingActions > 0 && <span className="queue-count">{snapshot.pendingActions} in coda</span>}
+          <button className={`topbar-icon ${dockView !== 'closed' && dockTab === 'output' ? 'active' : ''}`} title="Magic Panel" aria-label="Magic Panel" onClick={() => {
+            if (dockView !== 'closed' && dockTab === 'output') setDockView('closed');
+            else openDockTab('output');
+          }}>✦</button>
           <button className={`topbar-icon ${dockView !== 'closed' && dockTab === 'anteprima' ? 'active' : ''}`} title="OnarSuite web" onClick={() => {
             if (dockView !== 'closed' && dockTab === 'anteprima') { setDockView('closed'); }
             else { setLockWebPath(undefined); openWebDock(undefined); }
@@ -477,7 +482,8 @@ function WorkspaceDock(props: {
       {DOCK_TABS.map((t) => <button key={t.id} className={`dock-rail-btn ${tab === t.id ? 'active' : ''}`} title={t.label} aria-label={t.label} onClick={() => props.onTab(t.id)}>{t.icon}</button>)}
     </aside>;
   }
-  const tabLabel = DOCK_TABS.find((t) => t.id === tab)?.label ?? '';
+  const activeOutput = outputs[Math.min(selectedOutput, Math.max(0, outputs.length - 1))];
+  const tabLabel = tab === 'output' && activeOutput ? activeOutput.title : DOCK_TABS.find((t) => t.id === tab)?.label ?? '';
   return <aside className="dock">
     <div className="dock-resizer" onMouseDown={props.onResize} title="Trascina per ridimensionare" />
     <header className="dock-head">
@@ -584,8 +590,8 @@ function LockPreview({ panel, permissions, onNotice, onOpenLink }: { panel: Pane
     catch (error) { onNotice({ tone: 'error', text: errorText(error) }); }
   };
 
-  return <div className="lock-preview">
-    <span className="side-panel-kind">{PANEL_LABELS[panel.kind]}</span>
+  return <div className={`lock-preview panel-${panel.kind}`}>
+    {panel.kind !== 'form' && <span className="side-panel-kind">{PANEL_LABELS[panel.kind]}</span>}
     <div className="side-panel-title"><strong>{panel.title}</strong>{panel.ok !== undefined && <span className={`pill ${panel.ok ? 'ok' : 'err'}`}>{panel.ok ? '✓' : '✗'}</span>}</div>
     {panel.subtitle && <p className="side-panel-sub">{panel.subtitle}</p>}
     {panel.kind === 'form' && <ActionFormRenderer panel={panel} grantedPermissions={permissions} onNotice={onNotice} />}
