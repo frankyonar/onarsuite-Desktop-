@@ -205,12 +205,20 @@ export function detectIntent(message: string, registry = catalogById(), pending?
 }
 
 function findExplicitIntent(lowerMessage: string, registry: Record<string, ActionDefinition>): string | undefined {
+  // Quotes and contracts are commercially distinct workflows. Resolve these
+  // nouns before catalog aliases/fallbacks so a broad backend alias can never
+  // send a quote request to the contract form.
+  const wantsCreation = /(crea(?:re|mi|lo|melo)?|nuov[oa]|aggiung(?:i|ere)|prepara(?:re|mi)?|genera(?:re|mi)?|fammi|aiutami)/i.test(lowerMessage);
+  const mentionsQuote = /\b(preventiv[oi]|offert[ae]\s+commercial(?:e|i)|propost[ae]\s+commercial(?:e|i))\b/i.test(lowerMessage);
+  const mentionsContract = /\b(contratt[oi])\b/i.test(lowerMessage);
+  if (mentionsQuote && wantsCreation && registry['quotes.create']) return 'quotes.create';
+  if (mentionsContract && wantsCreation && registry['contracts.create']) return 'contracts.create';
+
   for (const [action, definition] of Object.entries(registry)) {
     if ((definition.aliases ?? []).some((alias) => lowerMessage.includes(alias))) return action;
   }
   if (/(cliente|clienti)/.test(lowerMessage) && /mostra|apri|vai|elenca|lista/.test(lowerMessage)) return 'clients.list';
   if (/(cliente|clienti)/.test(lowerMessage) && /crea|nuovo|aggiungi/.test(lowerMessage)) return 'clients.create';
-  if (/(contratto|contratti|preventivo)/.test(lowerMessage) && /crea|nuovo|aggiungi|prepara/.test(lowerMessage)) return 'contracts.create';
   if (/(promemoria|ricorda|ricordami|memo)/.test(lowerMessage) && /crea|nuovo|aggiungi|metti|fissa/.test(lowerMessage)) return 'reminders.create';
   return undefined;
 }

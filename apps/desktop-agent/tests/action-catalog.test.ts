@@ -20,6 +20,20 @@ describe('Action Catalog', () => {
     expect(detectIntent('Crea un utente per la collaboratrice')?.action).toBe('users.create');
   });
 
+  it('never confuses quotes with contracts', () => {
+    const quotePrompts = [
+      'aiutami a creare un preventivo',
+      'preparami un preventivo',
+      'fammi una proposta commerciale',
+      'genera una offerta commerciale',
+    ];
+    for (const prompt of quotePrompts) {
+      expect(detectIntent(prompt)?.action, prompt).toBe('quotes.create');
+      expect(detectIntent(prompt)?.action, prompt).not.toBe('contracts.create');
+    }
+    expect(detectIntent('aiutami a creare un contratto')?.action).toBe('contracts.create');
+  });
+
   it('accepts backend catalog envelopes and rejects invalid payloads', () => {
     expect(validCatalog({ actions: LOCAL_ACTION_CATALOG })?.length).toBe(LOCAL_ACTION_CATALOG.length);
     expect(validCatalog({ actions: [{ id: 'broken' }] })).toBeNull();
