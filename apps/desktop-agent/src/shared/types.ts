@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.9.31';
+export const APP_VERSION = '0.9.32';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -251,6 +251,99 @@ export interface FileContent {
   truncated: boolean;
 }
 
+export type MemoryIndexStatus = 'indexed' | 'metadata_only' | 'error';
+export type MemoryEmbeddingStatus = 'not_requested' | 'pending' | 'ready' | 'error';
+
+export interface MemoryPrivacy {
+  localOnly: boolean;
+  askBeforeCloud: boolean;
+  sensitiveDetected: boolean;
+  excludedFromAi: boolean;
+  allowedScopes: string[];
+}
+
+export interface MemoryEntity { type: string; value: string; }
+export interface MemoryRelation { type: string; target: string; }
+
+export interface MemoryChunk {
+  id: string;
+  fileId: string;
+  order: number;
+  title: string;
+  text: string;
+  hash: string;
+  tokenEstimate?: number;
+  embeddingStatus?: MemoryEmbeddingStatus;
+}
+
+export interface MemoryFileRecord {
+  id: string;
+  path: string;
+  name: string;
+  extension: string;
+  mimeType: string;
+  documentKind: string;
+  size: number;
+  hash: string;
+  createdAt: string;
+  modifiedAt: string;
+  indexedAt: string;
+  indexStatus: MemoryIndexStatus;
+  indexError?: string;
+  summaryShort: string;
+  summaryLong: string;
+  topics: string[];
+  entities: MemoryEntity[];
+  relations: MemoryRelation[];
+  privacy: MemoryPrivacy;
+  chunks: MemoryChunk[];
+}
+
+export interface MemoryScanResult {
+  roots: string[];
+  discovered: number;
+  indexed: number;
+  unchanged: number;
+  removed: number;
+  errors: number;
+  startedAt: string;
+  completedAt: string;
+}
+
+export interface MemoryEngineStatus {
+  state: 'idle' | 'scanning';
+  totalFiles: number;
+  processedFiles: number;
+  indexedFiles: number;
+  currentPath?: string;
+  lastScan?: MemoryScanResult;
+}
+
+export interface MemorySearchOptions {
+  limit?: number;
+  folder?: string;
+  extension?: string;
+  modifiedAfter?: string;
+  modifiedBefore?: string;
+}
+
+export interface MemorySearchResult {
+  record: MemoryFileRecord;
+  score: number;
+  matchedFields: string[];
+}
+
+export type MemoryBudgetLevel = 'simple' | 'medium' | 'advanced';
+
+export interface MemoryContextResult {
+  query: string;
+  budgetTokens: number;
+  estimatedTokens: number;
+  truncated: boolean;
+  fileIds: string[];
+  context: string;
+}
+
 export interface MaxDesktopApi {
   getSnapshot(): Promise<AppSnapshot>;
   pair(input: PairingInput): Promise<AppSnapshot>;
@@ -292,6 +385,12 @@ export interface MaxDesktopApi {
   explore(dirPath?: string): Promise<FsEntry[]>;
   readFileText(filePath: string): Promise<FileContent>;
   writeFileText(filePath: string, text: string): Promise<void>;
+  // --- Local Owner Memory Engine ---
+  scanMemory(folderPath?: string): Promise<MemoryScanResult>;
+  getMemoryStatus(): Promise<MemoryEngineStatus>;
+  searchMemory(query: string, options?: MemorySearchOptions): Promise<MemorySearchResult[]>;
+  getMemoryCard(fileId: string): Promise<string>;
+  getMemoryContext(query: string, level?: MemoryBudgetLevel): Promise<MemoryContextResult>;
   openExternal(url: string): Promise<void>;
   onar(actionType: string, data: Record<string, unknown>): Promise<OnarResult>;
   webLogin(serverUrl: string, appVersion: string): Promise<void>;

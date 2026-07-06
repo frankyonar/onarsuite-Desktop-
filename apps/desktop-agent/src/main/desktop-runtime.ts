@@ -2,7 +2,7 @@ import { dialog, safeStorage, shell } from 'electron';
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type ConsoleItem, type Conversation, type ConversationMeta, type FileAction, type FileContent, type FsEntry, type LocalFile, type PairingInput } from '../shared/types';
+import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type ConsoleItem, type Conversation, type ConversationMeta, type FileAction, type FileContent, type FsEntry, type LocalFile, type MemoryBudgetLevel, type MemoryContextResult, type MemoryEngineStatus, type MemoryScanResult, type MemorySearchOptions, type MemorySearchResult, type PairingInput } from '../shared/types';
 import { isAllowedPath } from '../shared/path-policy';
 import { AgentSdk, NetworkError, RevokedDeviceError } from './services/agent-sdk';
 import { AgentEngine } from './services/agent-engine';
@@ -12,6 +12,7 @@ import { AuditLog } from './services/audit-log';
 import { ConfigStore } from './services/config-store';
 import { isSupportedFile, parseDocument } from './services/document-parser';
 import { AssistantActionOrchestrator } from './services/assistant-actions';
+import { OwnerMemoryEngine } from './services/owner-memory/owner-memory-engine';
 
 const MAX_READ_BYTES = 500 * 1024;
 
@@ -47,6 +48,7 @@ export class DesktopRuntime {
   );
   readonly engine = new AgentEngine(this.sdk, this.tools, this.audit);
   readonly conversations = new ConversationStore(this.config.dataDirectory);
+  readonly memory = new OwnerMemoryEngine(this.config.dataDirectory);
   private activeConvId?: string;
   private connection: AppSnapshot['connection'] = 'not_paired';
   private readonly queuePath = path.join(this.config.dataDirectory, 'queue.json');
@@ -174,6 +176,7 @@ export class DesktopRuntime {
   async removeAuthorizedFolder(folderPath: string): Promise<AppSnapshot> {
     const config = await this.config.read();
     await this.config.update({ authorizedFolders: config.authorizedFolders.filter((folder) => folder !== folderPath) });
+    await this.memory.forgetRoot(folderPath);
     await this.audit.write('permission_updated', 'security', 'Autorizzazione cartella rimossa', { folder: folderPath });
     return this.snapshot();
   }
@@ -321,6 +324,7 @@ export class DesktopRuntime {
   async clearLocalData(): Promise<AppSnapshot> {
     await this.audit.clear();
     await this.conversations.clear();
+    await this.memory.clear();
     await rm(this.queuePath, { force: true });
     await this.config.clearAll();
     this.connection = 'not_paired';
@@ -536,6 +540,41 @@ export class DesktopRuntime {
     await this.assertAuthorized(filePath);
     await writeFile(filePath, text, 'utf8');
     await this.audit.write('file_edited', 'security', 'File modificato dall\'editor', { filename: path.basename(filePath) });
+  }
+
+  async scanMemory(folderPath?: string): Promise<MemoryScanResult> {
+    const config = await this.config.read();
+    let roots = [config.workspacePath, ...config.authorizedFolders];
+    if (folderPath) {
+      await this.assertAuthorized(folderPath);
+      const details = await stat(folderPath);
+      if (!details.isDirectory()) throw new Error('Il percorso da scansionare deve essere una cartella.');
+      roots = [await realpath(folderPath)];
+    }
+    const result = await this.memory.scan(roots);
+    await this.audit.write('memory_scan_completed', result.errors ? 'warning' : 'info', 'Scansione memoria locale completata', {
+      discovered: result.discovered,
+      indexed: result.indexed,
+      unchanged: result.unchanged,
+      errors: result.errors,
+    });
+    return result;
+  }
+
+  async getMemoryStatus(): Promise<MemoryEngineStatus> {
+    return this.memory.getStatus();
+  }
+
+  searchMemory(query: string, options?: MemorySearchOptions): Promise<MemorySearchResult[]> {
+    return this.memory.search(query, options);
+  }
+
+  getMemoryCard(fileId: string): Promise<string> {
+    return this.memory.card(fileId);
+  }
+
+  getMemoryContext(query: string, level?: MemoryBudgetLevel): Promise<MemoryContextResult> {
+    return this.memory.context(query, level);
   }
 
   /** Native OnarSuite call (list/create/…) used by the native module screens. */

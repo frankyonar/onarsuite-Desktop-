@@ -87,6 +87,11 @@ function registerIpc(): void {
   ipcMain.handle('fs:explore', (_event, dirPath?: string) => runtime.explore(dirPath));
   ipcMain.handle('fs:read', (_event, filePath: string) => runtime.readFileText(filePath));
   ipcMain.handle('fs:write', (_event, filePath: string, text: string) => runtime.writeFileText(filePath, text));
+  ipcMain.handle('memory:scan', (_event, folderPath?: string) => runtime.scanMemory(folderPath));
+  ipcMain.handle('memory:status', () => runtime.getMemoryStatus());
+  ipcMain.handle('memory:search', (_event, query: string, options) => runtime.searchMemory(query, options));
+  ipcMain.handle('memory:card', (_event, fileId: string) => runtime.getMemoryCard(fileId));
+  ipcMain.handle('memory:context', (_event, query: string, level) => runtime.getMemoryContext(query, level));
   ipcMain.handle('app:open-external', (_event, url: string) => shell.openExternal(url));
   ipcMain.handle('auth:web-session-url', (_event, nextPath?: string) => runtime.webSessionUrl(nextPath));
   ipcMain.handle('onar:action', (_event, actionType: string, data: Record<string, unknown>) => runtime.onarCall(actionType, data ?? {}));

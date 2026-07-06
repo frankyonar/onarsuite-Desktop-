@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.31', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.32', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', planName: 'PRO', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -144,6 +144,11 @@ export function createPreviewApi(): MaxDesktopApi {
     explore: async (dirPath) => tree[dirPath ?? ''] ?? [],
     readFileText: async (filePath) => ({ path: filePath, text: fileText[filePath] ?? '// File non disponibile in anteprima.', truncated: false }),
     writeFileText: async () => undefined,
+    scanMemory: async (folderPath) => ({ roots: [folderPath ?? snapshot.workspacePath], discovered: 2, indexed: 2, unchanged: 0, removed: 0, errors: 0, startedAt: new Date().toISOString(), completedAt: new Date().toISOString() }),
+    getMemoryStatus: async () => ({ state: 'idle', totalFiles: 2, processedFiles: 2, indexedFiles: 2 }),
+    searchMemory: async () => [],
+    getMemoryCard: async (fileId) => `OSMEM/1.0\n@node file:${fileId}\npermissions:\nlocal_only = true\nsend_to_cloud = ask`,
+    getMemoryContext: async (query, level = 'medium') => ({ query, budgetTokens: level === 'simple' ? 1000 : level === 'advanced' ? 12000 : 4000, estimatedTokens: 0, truncated: false, fileIds: [], context: '' }),
     openExternal: async () => undefined,
     webLogin: async () => undefined,
     webSessionUrl: async (nextPath?: string) => {
