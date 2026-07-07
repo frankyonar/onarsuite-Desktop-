@@ -92,6 +92,12 @@ function registerIpc(): void {
   ipcMain.handle('memory:search', (_event, query: string, options) => runtime.searchMemory(query, options));
   ipcMain.handle('memory:card', (_event, fileId: string) => runtime.getMemoryCard(fileId));
   ipcMain.handle('memory:context', (_event, query: string, level) => runtime.getMemoryContext(query, level));
+  ipcMain.handle('workspace:providers', () => runtime.listWorkspaceProviders());
+  ipcMain.handle('workspace:status', () => runtime.getWorkspaceStatus());
+  ipcMain.handle('workspace:search', (_event, query: string, options) => runtime.searchWorkspace(query, options));
+  ipcMain.handle('workspace:resource', (_event, id: string, provider?: string) => runtime.getWorkspaceResource(id, provider));
+  ipcMain.handle('workspace:card', (_event, id: string, provider?: string) => runtime.getWorkspaceCard(id, provider));
+  ipcMain.handle('workspace:context', (_event, request) => runtime.buildWorkspaceContext(request));
   ipcMain.handle('app:open-external', (_event, url: string) => shell.openExternal(url));
   ipcMain.handle('auth:web-session-url', (_event, nextPath?: string) => runtime.webSessionUrl(nextPath));
   ipcMain.handle('onar:action', (_event, actionType: string, data: Record<string, unknown>) => runtime.onarCall(actionType, data ?? {}));

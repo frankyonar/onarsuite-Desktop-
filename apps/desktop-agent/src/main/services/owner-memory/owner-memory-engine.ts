@@ -76,6 +76,16 @@ export class OwnerMemoryEngine {
     return generateOsmem(record);
   }
 
+  /** Resolve a single indexed record by id (used by the Virtual Workspace provider). */
+  async record(fileId: string): Promise<MemoryFileRecord | null> {
+    return (await this.readIndex()).records.find((item) => item.id === fileId) ?? null;
+  }
+
+  /** Total number of indexed records (used for provider status). */
+  async count(): Promise<number> {
+    return (await this.readIndex()).records.length;
+  }
+
   async context(query: string, level: MemoryBudgetLevel = 'medium'): Promise<MemoryContextResult> {
     const results = (await this.search(query, { limit: 30 }))
       .filter(({ record }) => !record.privacy.excludedFromAi);

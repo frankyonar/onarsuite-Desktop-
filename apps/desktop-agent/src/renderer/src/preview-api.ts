@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.32', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.33', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', planName: 'PRO', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -149,6 +149,30 @@ export function createPreviewApi(): MaxDesktopApi {
     searchMemory: async () => [],
     getMemoryCard: async (fileId) => `OSMEM/1.0\n@node file:${fileId}\npermissions:\nlocal_only = true\nsend_to_cloud = ask`,
     getMemoryContext: async (query, level = 'medium') => ({ query, budgetTokens: level === 'simple' ? 1000 : level === 'advanced' ? 12000 : 4000, estimatedTokens: 0, truncated: false, fileIds: [], context: '' }),
+    listWorkspaceProviders: async () => [
+      { key: 'local-memory', label: 'Memoria locale (Desktop)', source: 'local', capabilities: ['search', 'read', 'card', 'scan'], status: { state: 'ready', resourceCount: 2 } },
+      { key: 'onarsuite-cloud', label: 'OnarSuite Cloud', source: 'cloud', capabilities: ['search', 'read', 'sync'], status: { state: 'ready' } },
+      { key: 'github', label: 'GitHub', source: 'connector', capabilities: ['search', 'read'], status: { state: 'not_connected' } },
+    ],
+    getWorkspaceStatus: async () => ({
+      providers: [
+        { key: 'local-memory', label: 'Memoria locale (Desktop)', source: 'local', capabilities: ['search', 'read', 'card', 'scan'], status: { state: 'ready', resourceCount: 2 } },
+      ],
+      totalResources: 2,
+    }),
+    searchWorkspace: async () => [],
+    getWorkspaceResource: async () => null,
+    getWorkspaceCard: async (id) => `OSMEM/1.0\n@node file:${id}\npermissions:\nlocal_only = true`,
+    buildWorkspaceContext: async (request) => ({
+      query: request.query,
+      mode: request.mode ?? 'hybrid',
+      context: '',
+      usedTokens: 0,
+      maxTokens: request.level === 'simple' ? 1000 : request.level === 'advanced' ? 12000 : 4000,
+      includedResources: [],
+      excludedResources: [],
+      reason: 'Anteprima: nessuna risorsa indicizzata.',
+    }),
     openExternal: async () => undefined,
     webLogin: async () => undefined,
     webSessionUrl: async (nextPath?: string) => {

@@ -1,4 +1,14 @@
-export const APP_VERSION = '0.9.32';
+import type {
+  AiContextRequest,
+  AiContextResult,
+  ProviderDescriptor,
+  WorkspaceResource,
+  WorkspaceSearchOptions,
+  WorkspaceSearchResult,
+  WorkspaceStatus,
+} from './workspace';
+
+export const APP_VERSION = '0.9.33';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -391,6 +401,13 @@ export interface MaxDesktopApi {
   searchMemory(query: string, options?: MemorySearchOptions): Promise<MemorySearchResult[]>;
   getMemoryCard(fileId: string): Promise<string>;
   getMemoryContext(query: string, level?: MemoryBudgetLevel): Promise<MemoryContextResult>;
+  // --- Virtual Workspace (unified layer over local memory, cloud, connectors) ---
+  listWorkspaceProviders(): Promise<ProviderDescriptor[]>;
+  getWorkspaceStatus(): Promise<WorkspaceStatus>;
+  searchWorkspace(query: string, options?: WorkspaceSearchOptions): Promise<WorkspaceSearchResult[]>;
+  getWorkspaceResource(id: string, provider?: string): Promise<WorkspaceResource | null>;
+  getWorkspaceCard(id: string, provider?: string): Promise<string>;
+  buildWorkspaceContext(request: AiContextRequest): Promise<AiContextResult>;
   openExternal(url: string): Promise<void>;
   onar(actionType: string, data: Record<string, unknown>): Promise<OnarResult>;
   webLogin(serverUrl: string, appVersion: string): Promise<void>;

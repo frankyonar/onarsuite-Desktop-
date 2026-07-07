@@ -13,6 +13,10 @@ import { ConfigStore } from './services/config-store';
 import { isSupportedFile, parseDocument } from './services/document-parser';
 import { AssistantActionOrchestrator } from './services/assistant-actions';
 import { OwnerMemoryEngine } from './services/owner-memory/owner-memory-engine';
+import { VirtualWorkspace } from './services/workspace/virtual-workspace';
+import { LocalMemoryProvider } from './services/workspace/local-memory-provider';
+import { createCloudProvider, createConnectorProviders } from './services/workspace/remote-providers';
+import type { AiContextRequest, AiContextResult, ProviderDescriptor, WorkspaceResource, WorkspaceSearchOptions, WorkspaceSearchResult, WorkspaceStatus } from '../shared/workspace';
 
 const MAX_READ_BYTES = 500 * 1024;
 
@@ -49,6 +53,10 @@ export class DesktopRuntime {
   readonly engine = new AgentEngine(this.sdk, this.tools, this.audit);
   readonly conversations = new ConversationStore(this.config.dataDirectory);
   readonly memory = new OwnerMemoryEngine(this.config.dataDirectory);
+  /** Unified AI-readable layer over the local Memory Engine, cloud and connectors. */
+  readonly workspace = new VirtualWorkspace()
+    .register(new LocalMemoryProvider(this.memory))
+    .register(createCloudProvider(() => this.connection !== 'not_paired' && this.connection !== 'revoked'));
   private activeConvId?: string;
   private connection: AppSnapshot['connection'] = 'not_paired';
   private readonly queuePath = path.join(this.config.dataDirectory, 'queue.json');
@@ -58,6 +66,7 @@ export class DesktopRuntime {
   async initialize(): Promise<void> {
     const config = await this.config.read();
     this.connection = config.deviceId ? 'offline' : 'not_paired';
+    for (const connector of createConnectorProviders()) this.workspace.register(connector);
     await this.audit.write('app_started', 'info', 'Max Desktop avviato', { appVersion: APP_VERSION });
     if (!safeStorage.isEncryptionAvailable()) {
       await this.audit.write('secure_storage_unavailable', 'warning', 'Archiviazione sicura non disponibile: il token non verra salvato.');
@@ -575,6 +584,31 @@ export class DesktopRuntime {
 
   getMemoryContext(query: string, level?: MemoryBudgetLevel): Promise<MemoryContextResult> {
     return this.memory.context(query, level);
+  }
+
+  // --- Virtual Workspace (unified layer over local memory, cloud, connectors) ---
+  listWorkspaceProviders(): Promise<ProviderDescriptor[]> {
+    return this.workspace.describeProviders();
+  }
+
+  getWorkspaceStatus(): Promise<WorkspaceStatus> {
+    return this.workspace.status();
+  }
+
+  searchWorkspace(query: string, options?: WorkspaceSearchOptions): Promise<WorkspaceSearchResult[]> {
+    return this.workspace.search(query, options);
+  }
+
+  getWorkspaceResource(id: string, provider?: string): Promise<WorkspaceResource | null> {
+    return this.workspace.get(id, provider);
+  }
+
+  getWorkspaceCard(id: string, provider?: string): Promise<string> {
+    return this.workspace.card(id, provider);
+  }
+
+  buildWorkspaceContext(request: AiContextRequest): Promise<AiContextResult> {
+    return this.workspace.context(request);
   }
 
   /** Native OnarSuite call (list/create/…) used by the native module screens. */
