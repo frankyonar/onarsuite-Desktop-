@@ -11,6 +11,7 @@ import type {
 import type { OwnerMemoryEngine } from '../owner-memory/owner-memory-engine';
 import type { WorkspaceProvider } from './provider';
 import { computeScores } from './retrieval';
+import { cosine, HashingEmbedder } from './embeddings';
 
 /**
  * Adapts the local {@link OwnerMemoryEngine} to a {@link WorkspaceProvider}.
@@ -24,6 +25,8 @@ export class LocalMemoryProvider implements WorkspaceProvider {
   readonly label = 'Memoria locale (Desktop)';
   readonly source = 'local' as const;
   readonly capabilities: ProviderCapability[] = ['search', 'read', 'card', 'scan'];
+
+  private readonly embedder = new HashingEmbedder();
 
   constructor(private readonly engine: OwnerMemoryEngine) {}
 
@@ -45,7 +48,8 @@ export class LocalMemoryProvider implements WorkspaceProvider {
       folder: options.folder,
     });
     const keywordMax = results.reduce((max, item) => Math.max(max, item.score), 0);
-    return results.map((item) => this.toSearchResult(item, keywordMax, mode));
+    const queryVector = this.embedder.embed(query);
+    return results.map((item) => this.toSearchResult(item, keywordMax, mode, queryVector));
   }
 
   async get(id: string): Promise<WorkspaceResource | null> {
@@ -57,15 +61,29 @@ export class LocalMemoryProvider implements WorkspaceProvider {
     return this.engine.card(id);
   }
 
-  private toSearchResult(item: MemorySearchResult, keywordMax: number, mode: WorkspaceSearchOptions['mode']): WorkspaceSearchResult {
+  private toSearchResult(item: MemorySearchResult, keywordMax: number, mode: WorkspaceSearchOptions['mode'], queryVector: Float32Array): WorkspaceSearchResult {
     const resource = toResource(item.record);
+    const semantic = cosine(queryVector, this.embedder.embed(recordText(item.record)));
     return {
       resource,
-      scores: computeScores({ keywordRaw: item.score, keywordMax, resource, mode: mode ?? 'desktop' }),
+      scores: computeScores({ keywordRaw: item.score, keywordMax, semantic, resource, mode: mode ?? 'desktop' }),
       matchedFields: item.matchedFields,
       snippet: item.record.summaryShort || undefined,
     };
   }
+}
+
+/** Text surface used for semantic embedding: the descriptive fields, not raw body. */
+function recordText(record: MemoryFileRecord): string {
+  return [
+    record.name,
+    record.summaryShort,
+    record.summaryLong,
+    record.topics.join(' '),
+    record.entities.map((entity) => entity.value).join(' '),
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export function toResource(record: MemoryFileRecord): WorkspaceResource {

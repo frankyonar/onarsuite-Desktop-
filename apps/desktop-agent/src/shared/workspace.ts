@@ -74,8 +74,8 @@ export interface WorkspaceResource {
 /**
  * Retrieval scores. `semantic` and `keyword` are the two recall signals;
  * `recency` and `permission` re-rank them; `final` is the blended score used
- * for ordering. Semantic stays 0 until embeddings land in Phase 2 — the field
- * is present now so the ranking pipeline never changes shape later.
+ * for ordering. Local search fills `semantic` via a local embedder (cosine over
+ * hashed features); remote providers may leave it 0 until they embed too.
  */
 export interface RetrievalScores {
   semantic: number;
