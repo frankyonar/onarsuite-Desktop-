@@ -43,22 +43,6 @@ export class RemoteStubProvider implements WorkspaceProvider {
   }
 }
 
-/** OnarSuite Cloud provider — ready once the desktop app is paired to an account. */
-export function createCloudProvider(isPaired: () => boolean): RemoteStubProvider {
-  return new RemoteStubProvider(
-    'onarsuite-cloud',
-    'OnarSuite Cloud',
-    'cloud',
-    () => ({
-      state: isPaired() ? 'ready' : 'not_configured',
-      message: isPaired()
-        ? 'Collegato. Sincronizzazione contenuti disponibile in Fase 2.'
-        : 'Collega OnarSuite Desktop a un account per abilitare il cloud.',
-    }),
-    ['search', 'read', 'sync'],
-  );
-}
-
 /** Connector providers (Google Drive, Gmail, GitHub, …). Gestiti online via OAuth. */
 export function createConnectorProviders(): RemoteStubProvider[] {
   const connectors: Array<{ key: string; label: string }> = [

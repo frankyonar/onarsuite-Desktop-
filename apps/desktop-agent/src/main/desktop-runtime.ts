@@ -15,7 +15,8 @@ import { AssistantActionOrchestrator } from './services/assistant-actions';
 import { OwnerMemoryEngine } from './services/owner-memory/owner-memory-engine';
 import { VirtualWorkspace } from './services/workspace/virtual-workspace';
 import { LocalMemoryProvider } from './services/workspace/local-memory-provider';
-import { createCloudProvider, createConnectorProviders } from './services/workspace/remote-providers';
+import { CloudBridgeProvider } from './services/workspace/cloud-bridge-provider';
+import { createConnectorProviders } from './services/workspace/remote-providers';
 import type { AiContextRequest, AiContextResult, ProviderDescriptor, WorkspaceResource, WorkspaceSearchOptions, WorkspaceSearchResult, WorkspaceStatus } from '../shared/workspace';
 
 const MAX_READ_BYTES = 500 * 1024;
@@ -58,7 +59,10 @@ export class DesktopRuntime {
   /** Unified AI-readable layer over the local Memory Engine, cloud and connectors. */
   readonly workspace = new VirtualWorkspace()
     .register(new LocalMemoryProvider(this.memory))
-    .register(createCloudProvider(() => this.connection !== 'not_paired' && this.connection !== 'revoked'));
+    .register(new CloudBridgeProvider(
+      (query, limit) => this.sdk.workspaceSearch(query, limit),
+      () => this.connection !== 'not_paired' && this.connection !== 'revoked',
+    ));
   private activeConvId?: string;
   private connection: AppSnapshot['connection'] = 'not_paired';
   private readonly queuePath = path.join(this.config.dataDirectory, 'queue.json');

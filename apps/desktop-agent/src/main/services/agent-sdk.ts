@@ -86,6 +86,14 @@ export class AgentSdk {
     return { success: Boolean(result.success), message: result.message || result.error || 'Azione completata.', data: result.data };
   }
 
+  /** Query the account's cloud Virtual Workspace (Hybrid bridge). Returns the
+   *  raw scored rows so the cloud provider can map them into resources. */
+  async workspaceSearch(query: string, limit = 8): Promise<Array<Record<string, unknown>>> {
+    const q = `q=${encodeURIComponent(query)}&limit=${limit}`;
+    const result = await this.request<{ results?: Array<Record<string, unknown>> }>(`/api/agent/workspace/search?${q}`, { method: 'GET' });
+    return Array.isArray(result.results) ? result.results : [];
+  }
+
   /** One tool-calling step. The server runs inference; we execute tools locally. */
   async agentStep(
     agentSystem: string,
