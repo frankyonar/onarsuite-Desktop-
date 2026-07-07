@@ -50,6 +50,7 @@ export class DesktopRuntime {
     (filePath) => this.performFileAction(filePath, 'upload'),
     (actionType, data) => this.sdk.onarExecute(actionType, data),
     (query) => this.workspace.search(query, { limit: 8 }),
+    (query, level) => this.workspace.context({ query, level, mode: 'desktop' }),
   );
   readonly engine = new AgentEngine(this.sdk, this.tools, this.audit);
   readonly conversations = new ConversationStore(this.config.dataDirectory);

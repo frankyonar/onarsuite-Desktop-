@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { ActionResult } from '../../shared/types';
-import type { WorkspaceSearchResult } from '../../shared/workspace';
+import type { AiContextResult, WorkspaceBudgetLevel, WorkspaceSearchResult } from '../../shared/workspace';
 import { isAllowedPath } from '../../shared/path-policy';
 import type { AuditLog } from './audit-log';
 import type { ConfigStore } from './config-store';
@@ -43,6 +43,7 @@ export class AgentTools {
     private readonly onarUpload: (filePath: string) => Promise<ActionResult>,
     private readonly onarExecute: (actionType: string, data: Record<string, unknown>) => Promise<{ success: boolean; message: string; data?: unknown }>,
     private readonly workspaceSearch: (query: string) => Promise<WorkspaceSearchResult[]>,
+    private readonly workspaceContext: (query: string, level: WorkspaceBudgetLevel) => Promise<AiContextResult>,
   ) {}
 
   /** OpenAI-style tool schemas advertised to the model each step. */
@@ -61,6 +62,10 @@ export class AgentTools {
       }, ['query']),
       fn('search_memory', 'Cerca nel Virtual Workspace (memoria locale indicizzata: nomi, riassunti, argomenti, contenuti di PDF/DOCX/XLSX già scansionati). Usa questo PRIMA di leggere file: trova i documenti più rilevanti senza aprirli. Restituisce nome, percorso e riassunto ordinati per rilevanza.', {
         query: { type: 'string', description: 'Cosa cercare (argomento, cliente, tipo di documento…).' },
+      }, ['query']),
+      fn('workspace_context', 'Costruisci un CONTESTO AI compatto dai documenti locali rilevanti, rispettando un budget di token. Restituisce le schede OSMEM già pronte (riassunti, argomenti, entità) senza aprire i file: usalo per RISPONDERE a una domanda su più documenti risparmiando token, invece di leggerli uno per uno.', {
+        query: { type: 'string', description: 'La domanda o l\'argomento su cui serve il contesto.' },
+        level: { type: 'string', description: 'Budget token: simple (~1k), medium (~4k, default), advanced (~12k).' },
       }, ['query']),
       fn('write_file', 'Crea o sovrascrive un file con il contenuto fornito.', {
         path: filePath,
@@ -111,6 +116,7 @@ export class AgentTools {
       case 'list_dir': return this.listDir(args.path ? String(args.path) : undefined);
       case 'search_files': return this.search(String(args.query ?? ''), args.path ? String(args.path) : undefined);
       case 'search_memory': return this.searchMemory(String(args.query ?? ''));
+      case 'workspace_context': return this.workspaceContextTool(String(args.query ?? ''), String(args.level ?? 'medium'));
       case 'write_file': return this.writeFile(String(args.path ?? ''), String(args.content ?? ''));
       case 'edit_file': return this.editFile(String(args.path ?? ''), String(args.old_string ?? ''), String(args.new_string ?? ''), Boolean(args.replace_all));
       case 'create_file': return this.createFile(String(args.path ?? ''), String(args.content ?? ''));
@@ -209,6 +215,18 @@ export class AgentTools {
       })
       .join('\n');
     return ok(cap(body), `${results.length} risultati per "${query}"`);
+  }
+
+  private async workspaceContextTool(query: string, level: string): Promise<ToolResult> {
+    if (!query.trim()) return { ok: false, content: 'Query vuota.', preview: 'Query vuota' };
+    const budget: WorkspaceBudgetLevel = level === 'simple' || level === 'advanced' ? level : 'medium';
+    const result = await this.workspaceContext(query, budget);
+    await this.log('agent_memory_context', 'info', 'Contesto AI dal Virtual Workspace', { query, level: budget, usedTokens: result.usedTokens, included: result.includedResources.length });
+    if (!result.context) {
+      return ok(`Nessun contesto disponibile in memoria per "${query}". ${result.reason}`, `0 token · ${query}`);
+    }
+    const header = `[Contesto Virtual Workspace · ${result.usedTokens}/${result.maxTokens} token · ${result.includedResources.length} risorse]\n`;
+    return ok(cap(header + result.context), `${result.usedTokens} token · ${result.includedResources.length} risorse`);
   }
 
   private async writeFile(p: string, content: string): Promise<ToolResult> {

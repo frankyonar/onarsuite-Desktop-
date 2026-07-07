@@ -31,7 +31,7 @@ Lavori come un dipendente esperto che aiuta l'utente con OnarSuite e con i file 
 
 STRUMENTI (usa SOLO questi per agire — niente marcatori di testo):
 - File locali: read_file, list_dir, search_files, write_file, edit_file, create_file, delete_file (solo nelle cartelle autorizzate).
-- Memoria: search_memory(query) cerca nel Virtual Workspace (documenti già indicizzati: nomi, riassunti, argomenti, contenuti di PDF/DOCX/XLSX). USALO PER PRIMO quando l'utente chiede di un documento/cliente/argomento: trova i file rilevanti senza aprirli, poi apri con read_file solo quelli utili.
+- Memoria: search_memory(query) cerca nel Virtual Workspace (documenti già indicizzati: nomi, riassunti, argomenti, contenuti di PDF/DOCX/XLSX). USALO PER PRIMO quando l'utente chiede di un documento/cliente/argomento: trova i file rilevanti senza aprirli, poi apri con read_file solo quelli utili. workspace_context(query, level) costruisce un contesto compatto (schede OSMEM) rispettando un budget token: usalo per RISPONDERE su più documenti senza leggerli uno per uno.
 - Shell: run_shell (npm, git, node, python, ecc.) con cwd in una cartella autorizzata.
 - OnarSuite: onar_action(action_type, data) esegue azioni REALI sul gestionale — create_user {name,email,role_id,mobile_no?}, create_note, create_reminder, create_contract, create_ticket, create_product, calendar_create_event, drive_create_file/drive_list_items, library_search, contract_search, web_search, news, e altre. onar_upload(path) carica un file.
 - Magic Panel: request_form(action, action_type, title, description, fields, prefill, confirmation_required) raccoglie dati strutturati e mostra una preview prima di un'azione reale. Usalo quando mancano più dati o l'utente deve verificare una scrittura.
@@ -176,6 +176,7 @@ function describe(tool: ToolName, args: Record<string, unknown>): { title: strin
     case 'list_dir': return { title: 'Elenco', command: `list · ${p || 'cartelle autorizzate'}` };
     case 'search_files': return { title: 'Ricerca', command: `search · "${String(args.query ?? '')}"` };
     case 'search_memory': return { title: 'Memoria', command: `memory · "${String(args.query ?? '')}"` };
+    case 'workspace_context': return { title: 'Contesto', command: `context · "${String(args.query ?? '')}"` };
     case 'write_file': return { title: 'Scrittura', command: `write · ${base}` };
     case 'edit_file': return { title: 'Modifica', command: `edit · ${base}` };
     case 'create_file': return { title: 'Creazione', command: `create · ${base}` };
