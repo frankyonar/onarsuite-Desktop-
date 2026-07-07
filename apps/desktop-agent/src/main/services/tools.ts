@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { ActionResult } from '../../shared/types';
+import type { WorkspaceSearchResult } from '../../shared/workspace';
 import { isAllowedPath } from '../../shared/path-policy';
 import type { AuditLog } from './audit-log';
 import type { ConfigStore } from './config-store';
@@ -41,6 +42,7 @@ export class AgentTools {
     private readonly audit: AuditLog,
     private readonly onarUpload: (filePath: string) => Promise<ActionResult>,
     private readonly onarExecute: (actionType: string, data: Record<string, unknown>) => Promise<{ success: boolean; message: string; data?: unknown }>,
+    private readonly workspaceSearch: (query: string) => Promise<WorkspaceSearchResult[]>,
   ) {}
 
   /** OpenAI-style tool schemas advertised to the model each step. */
@@ -56,6 +58,9 @@ export class AgentTools {
       fn('search_files', 'Cerca una stringa nei file di testo dentro le cartelle autorizzate.', {
         query: { type: 'string', description: 'Testo da cercare (case-insensitive).' },
         path: { type: 'string', description: 'Cartella in cui cercare (opzionale).' },
+      }, ['query']),
+      fn('search_memory', 'Cerca nel Virtual Workspace (memoria locale indicizzata: nomi, riassunti, argomenti, contenuti di PDF/DOCX/XLSX già scansionati). Usa questo PRIMA di leggere file: trova i documenti più rilevanti senza aprirli. Restituisce nome, percorso e riassunto ordinati per rilevanza.', {
+        query: { type: 'string', description: 'Cosa cercare (argomento, cliente, tipo di documento…).' },
       }, ['query']),
       fn('write_file', 'Crea o sovrascrive un file con il contenuto fornito.', {
         path: filePath,
@@ -105,6 +110,7 @@ export class AgentTools {
       case 'read_file': return this.readFile(String(args.path ?? ''));
       case 'list_dir': return this.listDir(args.path ? String(args.path) : undefined);
       case 'search_files': return this.search(String(args.query ?? ''), args.path ? String(args.path) : undefined);
+      case 'search_memory': return this.searchMemory(String(args.query ?? ''));
       case 'write_file': return this.writeFile(String(args.path ?? ''), String(args.content ?? ''));
       case 'edit_file': return this.editFile(String(args.path ?? ''), String(args.old_string ?? ''), String(args.new_string ?? ''), Boolean(args.replace_all));
       case 'create_file': return this.createFile(String(args.path ?? ''), String(args.content ?? ''));
@@ -186,6 +192,23 @@ export class AgentTools {
     await this.log('agent_search', 'info', 'Ricerca nei file', { query, hits: hits.length });
     const body = hits.join('\n') || 'Nessun risultato.';
     return ok(cap(body), `${hits.length} risultati per "${query}"`);
+  }
+
+  private async searchMemory(query: string): Promise<ToolResult> {
+    if (!query.trim()) return { ok: false, content: 'Query vuota.', preview: 'Query vuota' };
+    const results = (await this.workspaceSearch(query))
+      .filter((item) => !item.resource.privacy.excludedFromAi)
+      .slice(0, 8);
+    await this.log('agent_memory_search', 'info', 'Ricerca nel Virtual Workspace', { query, hits: results.length });
+    if (!results.length) return ok('Nessun documento rilevante in memoria. Prova search_files o list_dir.', `0 risultati per "${query}"`);
+    const body = results
+      .map((item, i) => {
+        const r = item.resource;
+        const summary = item.snippet ? ` — ${item.snippet}` : '';
+        return `${i + 1}. ${r.name} [${r.provider}] (score ${item.scores.final.toFixed(2)})\n   ${r.path}${summary}`;
+      })
+      .join('\n');
+    return ok(cap(body), `${results.length} risultati per "${query}"`);
   }
 
   private async writeFile(p: string, content: string): Promise<ToolResult> {

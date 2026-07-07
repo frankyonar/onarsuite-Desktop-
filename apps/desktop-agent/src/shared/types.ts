@@ -8,7 +8,7 @@ import type {
   WorkspaceStatus,
 } from './workspace';
 
-export const APP_VERSION = '0.9.33';
+export const APP_VERSION = '0.9.34';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -54,6 +54,7 @@ export type ToolName =
   | 'read_file'
   | 'list_dir'
   | 'search_files'
+  | 'search_memory'
   | 'write_file'
   | 'edit_file'
   | 'create_file'
