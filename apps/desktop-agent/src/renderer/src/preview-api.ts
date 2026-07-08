@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.43', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.44', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', planName: 'PRO', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -187,7 +187,7 @@ export function createPreviewApi(): MaxDesktopApi {
       totalResources: 2,
     }),
     searchWorkspace: async (query) => [
-      { resource: { id: 'f1', source: 'local', provider: 'local-memory', path: 'C:/Clienti/Preventivo Rossi.pdf', virtualPath: '/local/Clienti/Preventivo Rossi.pdf', name: 'Preventivo Rossi.pdf', type: 'document', mime: 'application/pdf', extension: 'pdf', size: 248120, hash: 'h1', createdAt: new Date().toISOString(), modifiedAt: new Date().toISOString(), indexedAt: new Date().toISOString(), privacy: { localOnly: true, askBeforeCloud: true, sensitiveDetected: false, excludedFromAi: false, allowedScopes: ['local_retrieval'], readOnly: false, canSync: false, canEmbed: true, canSummarize: true }, metadata: { snippet: 'Preventivo cliente Rossi · €1.200' } }, scores: { semantic: 0.62, keyword: 1, recency: 0.9, permission: 1, final: 0.78 }, matchedFields: ['name', 'entities'], snippet: `Proposta commerciale — cliente Rossi · €1.200 · scad. 15/03/2026 (match: "${query}")` },
+      { resource: { id: 'f1', source: 'local', provider: 'local-memory', path: 'C:/Clienti/Preventivo Rossi.pdf', virtualPath: '/local/Clienti/Preventivo Rossi.pdf', name: 'Preventivo Rossi.pdf', type: 'document', mime: 'application/pdf', extension: 'pdf', size: 248120, hash: 'h1', createdAt: new Date().toISOString(), modifiedAt: new Date().toISOString(), indexedAt: new Date().toISOString(), privacy: { localOnly: true, askBeforeCloud: true, sensitiveDetected: true, excludedFromAi: false, allowedScopes: ['local_retrieval'], readOnly: false, canSync: false, canEmbed: true, canSummarize: true }, metadata: { snippet: 'Preventivo cliente Rossi · €1.200' } }, scores: { semantic: 0.62, keyword: 1, recency: 0.9, permission: 1, final: 0.78 }, matchedFields: ['name', 'entities'], snippet: `Proposta commerciale — cliente Rossi · €1.200 · scad. 15/03/2026 (match: "${query}")` },
       { resource: { id: 'contact:1', source: 'cloud', provider: 'onarsuite-cloud', path: 'contact:1', virtualPath: '/cloud/onarsuite/contact/1', name: 'Mario Rossi', type: 'contact', mime: 'application/x-onarsuite-contact', extension: '', size: 0, hash: '', createdAt: new Date().toISOString(), modifiedAt: new Date().toISOString(), indexedAt: '', privacy: { localOnly: false, askBeforeCloud: false, sensitiveDetected: false, excludedFromAi: false, allowedScopes: ['workspace_retrieval'], readOnly: true, canSync: false, canEmbed: false, canSummarize: true }, metadata: { snippet: 'mario@rossi.it · person' } }, scores: { semantic: 0.46, keyword: 1, recency: 0.82, permission: 1, final: 0.73 }, matchedFields: ['name'], snippet: 'mario@rossi.it · person' },
     ],
     getWorkspaceResource: async () => null,

@@ -52,6 +52,18 @@ describe('OnarOwnerMemoryEngine.graph', () => {
     expect(money.nodes.some((n) => n.label.includes('1.200'))).toBe(true);
   });
 
+  it('flags a record whose content is sensitive', async () => {
+    await writeFile(path.join(root, 'iban.txt'), 'Bonifico su IBAN IT60X0542811101000000123456 per il saldo.', 'utf8');
+    await engine.scan([root]);
+    const records = await Promise.all(
+      (await engine.graph()).nodes.filter((n) => n.kind === 'file').map((n) => engine.record(n.id.replace(/^file:/, ''))),
+    );
+    const iban = records.find((r) => r?.name === 'iban.txt');
+    const nota = records.find((r) => r?.name === 'nota.txt');
+    expect(iban?.privacy.sensitiveDetected).toBe(true);
+    expect(nota?.privacy.sensitiveDetected).toBe(false);
+  });
+
   it('persists a sparse embedding on each indexed record', async () => {
     const graph = await engine.graph();
     const fileNode = graph.nodes.find((n) => n.kind === 'file');

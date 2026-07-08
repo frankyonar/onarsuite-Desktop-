@@ -20,6 +20,7 @@ import { isSupportedFile, parseDocument } from '../document-parser';
 import { HashingEmbedder, recordEmbeddingText, toSparse } from '../workspace/embeddings';
 import { TextContentChunker } from './content-chunker';
 import { extractEntities } from './entity-extractor';
+import { detectSensitive } from './sensitive-detector';
 import { generateOsmem } from './osmem';
 import { TokenBudgetManager } from './token-budget';
 
@@ -312,6 +313,7 @@ export class OnarOwnerMemoryEngine {
     let summaryLong = '';
     let chunks: MemoryFileRecord['chunks'] = [];
     let entities: MemoryFileRecord['entities'] = old?.entities ?? [];
+    let sensitiveDetected = old?.privacy?.sensitiveDetected ?? false;
     let indexStatus: MemoryFileRecord['indexStatus'] = 'metadata_only';
     let indexError: string | undefined;
 
@@ -322,6 +324,7 @@ export class OnarOwnerMemoryEngine {
         summaryLong = parsed.summary.slice(0, 700);
         chunks = this.chunker.chunk(id, parsed.text);
         entities = extractEntities(parsed.text);
+        sensitiveDetected = detectSensitive(parsed.text).sensitive;
         indexStatus = 'indexed';
       } catch (error) {
         indexStatus = 'error';
@@ -348,12 +351,15 @@ export class OnarOwnerMemoryEngine {
       topics: inferTopics(filePath),
       entities,
       relations: [{ type: 'belongs_to', target: path.dirname(filePath) }, ...(old?.relations.filter((item) => item.type !== 'belongs_to') ?? [])],
-      privacy: old?.privacy ?? {
-        localOnly: true,
-        askBeforeCloud: true,
-        sensitiveDetected: false,
-        excludedFromAi: false,
-        allowedScopes: ['local_retrieval'],
+      // Keep any user-set flags; refresh sensitiveDetected from the current content.
+      privacy: {
+        ...(old?.privacy ?? {
+          localOnly: true,
+          askBeforeCloud: true,
+          excludedFromAi: false,
+          allowedScopes: ['local_retrieval'],
+        }),
+        sensitiveDetected,
       },
       chunks,
     };

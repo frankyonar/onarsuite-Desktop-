@@ -957,7 +957,7 @@ function WorkspaceView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'e
       <div className="entry-list">
         {results.map((result) => <button key={`${result.resource.provider}:${result.resource.id}`} className={`entry ${selected?.id === result.resource.id ? 'selected' : ''}`} onClick={() => void openCard(result)}>
           <span className="entry-icon">{result.resource.source === 'local' ? '▤' : result.resource.source === 'cloud' ? '☁' : '🔌'}</span>
-          <span className="entry-name">{result.resource.name}<small className="muted-line">{result.snippet ?? result.resource.virtualPath}</small></span>
+          <span className="entry-name">{result.resource.privacy.sensitiveDetected && <span title="Contiene dati sensibili" className="ws-sensitive">🔒</span>}{result.resource.name}<small className="muted-line">{result.snippet ?? result.resource.virtualPath}</small></span>
           <time>{result.scores.final.toFixed(2)}</time>
         </button>)}
         {searched && !results.length && <EmptyState icon="❖" title="Nessun risultato">Prova un altro termine o avvia una scansione dalle cartelle autorizzate.</EmptyState>}

@@ -8,7 +8,7 @@ import type {
   WorkspaceStatus,
 } from './workspace';
 
-export const APP_VERSION = '0.9.43';
+export const APP_VERSION = '0.9.44';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 

@@ -51,9 +51,12 @@ export function recencyScore(modifiedAt: string): number {
 export function permissionScore(resource: WorkspaceResource, mode: WorkspaceMode): number {
   const p = resource.privacy;
   if (p.excludedFromAi) return 0;
-  if (mode === 'cloud' && p.localOnly) return 0.2;
-  if (mode === 'cloud' && p.askBeforeCloud) return 0.6;
-  return 1;
+  let score = 1;
+  if (mode === 'cloud' && p.localOnly) score = 0.2;
+  else if (mode === 'cloud' && p.askBeforeCloud) score = 0.6;
+  // Sensitive content is held back further once it would leave the device.
+  if (p.sensitiveDetected && mode !== 'desktop') score = Math.min(score, mode === 'cloud' ? 0.3 : 0.7);
+  return score;
 }
 
 function clamp01(value: number): number {

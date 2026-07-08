@@ -700,6 +700,7 @@ pre.side-panel-text { font-family: var(--font-mono); font-size: 11.5px; backgrou
 .snap-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .snap-msg { display: block; margin-top: 8px; color: var(--muted); }
 .entry-name small { display: block; overflow: hidden; color: var(--muted); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+.ws-sensitive { margin-right: 4px; font-size: 10px; }
 .editor { min-height: 470px; display: flex; flex-direction: column; }
 .code-editor { flex: 1; min-height: 420px; width: 100%; resize: none; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; outline: none; background: var(--glass-strong); color: var(--ink); font: 12.5px/1.6 var(--font-mono); white-space: pre; overflow: auto; }
 .code-editor:focus { border-color: var(--ring); box-shadow: 0 0 0 3px rgba(59,130,246,.18); }
