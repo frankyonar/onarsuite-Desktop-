@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { OwnerMemoryEngine } from './owner-memory-engine';
+import { OnarOwnerMemoryEngine } from './owner-memory-engine';
 import { TokenBudgetManager } from './token-budget';
 
 const temporaryDirectories: string[] = [];
@@ -11,15 +11,15 @@ afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
-async function fixture(): Promise<{ root: string; engine: OwnerMemoryEngine }> {
+async function fixture(): Promise<{ root: string; engine: OnarOwnerMemoryEngine }> {
   const base = await mkdtemp(path.join(os.tmpdir(), 'onar-memory-'));
   temporaryDirectories.push(base);
   const root = path.join(base, 'authorized');
   await mkdir(root);
-  return { root, engine: new OwnerMemoryEngine(path.join(base, 'data')) };
+  return { root, engine: new OnarOwnerMemoryEngine(path.join(base, 'data')) };
 }
 
-describe('OwnerMemoryEngine', () => {
+describe('OnarOwnerMemoryEngine', () => {
   it('indexes supported content, ignores denied directories and skips unchanged files', async () => {
     const { root, engine } = await fixture();
     await writeFile(path.join(root, 'cliente-rossi.txt'), 'Contratto annuale per il cliente Rossi. Progetto turismo.');

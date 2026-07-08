@@ -8,13 +8,13 @@ import type {
   WorkspaceSearchOptions,
   WorkspaceSearchResult,
 } from '../../../shared/workspace';
-import type { OwnerMemoryEngine } from '../owner-memory/owner-memory-engine';
+import type { OnarOwnerMemoryEngine } from '../owner-memory/owner-memory-engine';
 import type { WorkspaceProvider } from './provider';
 import { computeScores } from './retrieval';
 import { cosine, HashingEmbedder } from './embeddings';
 
 /**
- * Adapts the local {@link OwnerMemoryEngine} to a {@link WorkspaceProvider}.
+ * Adapts the local {@link OnarOwnerMemoryEngine} to a {@link WorkspaceProvider}.
  * This is the `/local` branch of the Virtual Workspace: it reuses the existing
  * scan/index/osmem machinery instead of duplicating it. The Memory Engine stays
  * the source of truth; this layer only normalizes records into resources and
@@ -28,7 +28,7 @@ export class LocalMemoryProvider implements WorkspaceProvider {
 
   private readonly embedder = new HashingEmbedder();
 
-  constructor(private readonly engine: OwnerMemoryEngine) {}
+  constructor(private readonly engine: OnarOwnerMemoryEngine) {}
 
   async status(): Promise<WorkspaceProviderStatus> {
     const status = await this.engine.getStatus();

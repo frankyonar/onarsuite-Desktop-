@@ -35,7 +35,7 @@ const IGNORED_DIRECTORIES = new Set([
 const IGNORED_FILE_SUFFIXES = ['.tmp', '.temp', '.swp', '.swo', '.part', '.crdownload', '~'];
 const MAX_CONTENT_INDEX_BYTES = 25 * 1024 * 1024;
 
-export class OwnerMemoryEngine {
+export class OnarOwnerMemoryEngine {
   private readonly indexPath: string;
   private readonly chunker = new TextContentChunker();
   private readonly tokens = new TokenBudgetManager();

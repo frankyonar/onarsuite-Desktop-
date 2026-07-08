@@ -12,7 +12,7 @@ import { AuditLog } from './services/audit-log';
 import { ConfigStore } from './services/config-store';
 import { isSupportedFile, parseDocument } from './services/document-parser';
 import { AssistantActionOrchestrator } from './services/assistant-actions';
-import { OwnerMemoryEngine } from './services/owner-memory/owner-memory-engine';
+import { OnarOwnerMemoryEngine } from './services/owner-memory/owner-memory-engine';
 import { VirtualWorkspace } from './services/workspace/virtual-workspace';
 import { LocalMemoryProvider } from './services/workspace/local-memory-provider';
 import { CloudBridgeProvider } from './services/workspace/cloud-bridge-provider';
@@ -55,7 +55,7 @@ export class DesktopRuntime {
   );
   readonly engine = new AgentEngine(this.sdk, this.tools, this.audit);
   readonly conversations = new ConversationStore(this.config.dataDirectory);
-  readonly memory = new OwnerMemoryEngine(this.config.dataDirectory);
+  readonly memory = new OnarOwnerMemoryEngine(this.config.dataDirectory);
   /** Unified AI-readable layer over the local Memory Engine, cloud and connectors. */
   readonly workspace = new VirtualWorkspace()
     .register(new LocalMemoryProvider(this.memory))

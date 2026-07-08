@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { OwnerMemoryEngine } from './owner-memory-engine';
+import { OnarOwnerMemoryEngine } from './owner-memory-engine';
 
 // Files whose text shares entities (an email, an amount) so the graph links them.
 const FILES: Record<string, string> = {
@@ -11,10 +11,10 @@ const FILES: Record<string, string> = {
   'nota.txt': 'Promemoria: chiamare fornitore anna@acme.it.',
 };
 
-describe('OwnerMemoryEngine.graph', () => {
+describe('OnarOwnerMemoryEngine.graph', () => {
   let dir: string;
   let root: string;
-  let engine: OwnerMemoryEngine;
+  let engine: OnarOwnerMemoryEngine;
 
   beforeEach(async () => {
     dir = await mkdtemp(path.join(tmpdir(), 'osmem-graph-'));
@@ -23,7 +23,7 @@ describe('OwnerMemoryEngine.graph', () => {
     const { mkdir } = await import('node:fs/promises');
     await mkdir(root, { recursive: true });
     for (const [name, text] of Object.entries(FILES)) await writeFile(path.join(root, name), text, 'utf8');
-    engine = new OwnerMemoryEngine(dir);
+    engine = new OnarOwnerMemoryEngine(dir);
     await engine.scan([root]);
   });
 
