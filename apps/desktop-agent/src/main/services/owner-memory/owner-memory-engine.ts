@@ -13,6 +13,7 @@ import type {
 } from '../../../shared/types';
 import { isSupportedFile, parseDocument } from '../document-parser';
 import { TextContentChunker } from './content-chunker';
+import { extractEntities } from './entity-extractor';
 import { generateOsmem } from './osmem';
 import { TokenBudgetManager } from './token-budget';
 
@@ -188,6 +189,7 @@ export class OwnerMemoryEngine {
     let summaryShort = '';
     let summaryLong = '';
     let chunks: MemoryFileRecord['chunks'] = [];
+    let entities: MemoryFileRecord['entities'] = old?.entities ?? [];
     let indexStatus: MemoryFileRecord['indexStatus'] = 'metadata_only';
     let indexError: string | undefined;
 
@@ -197,6 +199,7 @@ export class OwnerMemoryEngine {
         summaryShort = parsed.summary.slice(0, 280);
         summaryLong = parsed.summary.slice(0, 700);
         chunks = this.chunker.chunk(id, parsed.text);
+        entities = extractEntities(parsed.text);
         indexStatus = 'indexed';
       } catch (error) {
         indexStatus = 'error';
@@ -221,7 +224,7 @@ export class OwnerMemoryEngine {
       summaryShort,
       summaryLong,
       topics: inferTopics(filePath),
-      entities: old?.entities ?? [],
+      entities,
       relations: [{ type: 'belongs_to', target: path.dirname(filePath) }, ...(old?.relations.filter((item) => item.type !== 'belongs_to') ?? [])],
       privacy: old?.privacy ?? {
         localOnly: true,
