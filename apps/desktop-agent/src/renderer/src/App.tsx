@@ -1,11 +1,12 @@
 ﻿import { createElement, useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
+import type { ProviderDescriptor, WorkspaceSearchResult } from '../../shared/workspace';
 import { AppLogo, BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard } from './components';
 import { ActionFormRenderer } from './MagicPanel';
 import { getUpdatePresentation } from './update-ui';
 
-type View = 'onarsuite' | 'clients' | 'agent' | 'explorer' | 'dashboard' | 'folders' | 'logs' | 'settings';
+type View = 'onarsuite' | 'clients' | 'agent' | 'explorer' | 'workspace' | 'dashboard' | 'folders' | 'logs' | 'settings';
 type Theme = 'light' | 'dark';
 
 function useTheme(): [Theme, () => void] {
@@ -23,6 +24,7 @@ function useTheme(): [Theme, () => void] {
 
 const navItems: Array<{ id: View; label: string; icon: string }> = [
   { id: 'agent', label: 'Chat Max', icon: '◆' },
+  { id: 'workspace', label: 'Workspace', icon: '❖' },
   { id: 'explorer', label: 'File locali', icon: '▤' },
   { id: 'folders', label: 'Cartelle autorizzate', icon: '▱' },
   { id: 'logs', label: 'Attività', icon: '≡' },
@@ -277,6 +279,7 @@ export function App() {
       {view === 'clients' && <ClientsView />}
       {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} onPersist={(items) => void persistConversation(activeConv.id, items)} onPanel={showPanel} onAssistantAction={(openUrl) => { const nextPath = openUrl ? new URL(openUrl).pathname + new URL(openUrl).search : undefined; openWebDock(nextPath); setNotice({ tone: 'success', text: 'Max ha preparato questa operazione nel pannello laterale.' }); }} onTitle={(id) => void titleConversation(id)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
+      {view === 'workspace' && <WorkspaceView onNotice={setNotice} />}
       {view === 'dashboard' && <Dashboard snapshot={snapshot} files={files} logs={logs} onGoAgent={() => setView('agent')} onSync={() => run(() => window.maxDesktop.syncNow())} />}
       {view === 'folders' && <FoldersView snapshot={snapshot} busy={busy} onAdd={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemove={(folder) => run(() => window.maxDesktop.removeAuthorizedFolder(folder))} onDrop={importDrop} onChoose={() => run(() => window.maxDesktop.chooseFiles(), 'File aggiunti alla workspace.')} />}
       {view === 'logs' && <LogsView logs={logs} />}
@@ -877,6 +880,73 @@ function ExplorerView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'er
   </div>;
 }
 
+const PROVIDER_STATE_LABELS: Record<string, string> = {
+  ready: 'Attivo', scanning: 'Scansione…', not_configured: 'Da configurare', not_connected: 'Non collegato', error: 'Errore',
+};
+
+function WorkspaceView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void }) {
+  const [providers, setProviders] = useState<ProviderDescriptor[]>([]);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<WorkspaceSearchResult[]>([]);
+  const [selected, setSelected] = useState<{ id: string; provider: string }>();
+  const [card, setCard] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  const loadProviders = useCallback(async () => {
+    try { setProviders(await window.maxDesktop.listWorkspaceProviders()); }
+    catch (error) { onNotice({ tone: 'error', text: errorText(error) }); }
+  }, [onNotice]);
+
+  useEffect(() => { void loadProviders(); }, [loadProviders]);
+
+  const search = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!query.trim()) return;
+    setBusy(true); setSelected(undefined); setCard('');
+    try {
+      setResults(await window.maxDesktop.searchWorkspace(query, { limit: 20 }));
+      setSearched(true);
+    } catch (error) { onNotice({ tone: 'error', text: errorText(error) }); }
+    finally { setBusy(false); }
+  };
+
+  const openCard = async (result: WorkspaceSearchResult) => {
+    const { id, provider } = result.resource;
+    setSelected({ id, provider });
+    try { setCard(await window.maxDesktop.getWorkspaceCard(id, provider)); }
+    catch (error) { setCard(''); onNotice({ tone: 'error', text: errorText(error) }); }
+  };
+
+  return <div className="explorer">
+    <Card className="explorer-tree" title="Workspace" eyebrow="LIVELLO AI UNIFICATO" action={<Button variant="ghost" onClick={() => void loadProviders()}>↻</Button>}>
+      <div className="ws-providers">
+        {providers.map((p) => <div key={p.key} className="ws-provider">
+          <span className={`log-dot ${p.status.state === 'ready' ? 'info' : p.status.state === 'error' ? 'error' : 'warning'}`} />
+          <div><strong>{p.label}</strong><small>{p.source} · {PROVIDER_STATE_LABELS[p.status.state] ?? p.status.state}{p.status.resourceCount !== undefined ? ` · ${p.status.resourceCount} risorse` : ''}</small></div>
+        </div>)}
+        {!providers.length && <p className="muted-line">Carico provider…</p>}
+      </div>
+      <form className="ws-search" onSubmit={search}>
+        <input value={query} placeholder="Cerca in tutto il Workspace…" onChange={(event) => setQuery(event.target.value)} />
+        <Button disabled={busy || !query.trim()}>{busy ? '…' : 'Cerca'}</Button>
+      </form>
+      <div className="entry-list">
+        {results.map((result) => <button key={`${result.resource.provider}:${result.resource.id}`} className={`entry ${selected?.id === result.resource.id ? 'selected' : ''}`} onClick={() => void openCard(result)}>
+          <span className="entry-icon">{result.resource.source === 'local' ? '▤' : result.resource.source === 'cloud' ? '☁' : '🔌'}</span>
+          <span className="entry-name">{result.resource.name}<small className="muted-line">{result.snippet ?? result.resource.virtualPath}</small></span>
+          <time>{result.scores.final.toFixed(2)}</time>
+        </button>)}
+        {searched && !results.length && <EmptyState icon="❖" title="Nessun risultato">Prova un altro termine o avvia una scansione dalle cartelle autorizzate.</EmptyState>}
+        {!searched && <p className="muted-line">Cerca per nome, contenuto, argomento o entità (email, importi, date…).</p>}
+      </div>
+    </Card>
+    <Card className="editor" eyebrow="SCHEDA OSMEM" title={selected ? selected.id : 'Nessuna risorsa selezionata'}>
+      {card ? <pre className="code-editor ws-card" style={{ whiteSpace: 'pre-wrap' }}>{card}</pre> : <EmptyState icon="←" title="Seleziona un risultato">La scheda di memoria (OSMEM) della risorsa apparirà qui.</EmptyState>}
+    </Card>
+  </div>;
+}
+
 function Dashboard({ snapshot, files, logs, onGoAgent, onSync }: { snapshot: AppSnapshot; files: LocalFile[]; logs: AuditEntry[]; onGoAgent: () => void; onSync: () => void }) { return <div className="page-grid"><Card className="hero-card"><div className="hero-copy"><span className="eyebrow">DIPENDENTE DIGITALE</span><h2>{snapshot.connection === 'connected' ? 'Max è pronto a lavorare.' : 'Max è offline.'}</h2><p>Dai a Max un obiettivo: legge i file, esegue comandi e crea cose in OnarSuite, in autonomia e con audit completo.</p><div className="hero-actions"><Button onClick={onGoAgent}>Apri l'agente</Button><Button variant="secondary" onClick={onSync}>Controlla connessione</Button></div></div><div className="orb"><BrandMark size={84} /><StatusPill state={snapshot.connection} /></div></Card><div className="stats-grid"><Stat label="Documenti visibili" value={String(files.length)} detail="Workspace e cartelle autorizzate" /><Stat label="Cartelle autorizzate" value={String(snapshot.authorizedFolders.length)} detail="Ambito operativo di Max" /><Stat label="Ultimo sync" value={snapshot.lastSyncAt ? formatDate(snapshot.lastSyncAt) : 'Mai'} detail={`Versione ${snapshot.appVersion}`} /></div><Card title="Attività recenti">{logs.length ? <div className="activity-list">{logs.slice(0, 6).map((log) => <div key={log.id}><span className={`log-dot ${log.level}`} /><div><strong>{log.message}</strong><small>{formatDate(log.createdAt)} · {log.eventType}</small></div></div>)}</div> : <EmptyState icon="◎" title="Nessuna attività">Le azioni di Max appariranno qui.</EmptyState>}</Card></div>; }
 function Stat({ label, value, detail }: { label: string; value: string; detail: string }) { return <Card><span className="stat-label">{label}</span><strong className="stat-value">{value}</strong><small>{detail}</small></Card>; }
 
@@ -1028,7 +1098,7 @@ function ClientsView() {
   );
 }
 
-const viewTitles: Record<View, string> = { onarsuite: 'Skills di Max', clients: 'Clienti', agent: 'Agente Max', explorer: 'Esplora file', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
+const viewTitles: Record<View, string> = { onarsuite: 'Skills di Max', clients: 'Clienti', agent: 'Agente Max', explorer: 'Esplora file', workspace: 'Virtual Workspace', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
 function iconFor(ext?: string) { if (!ext) return '▢'; if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return '▤'; if (['xlsx', 'csv'].includes(ext)) return '▦'; if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) return '▣'; return '◇'; }
 function shortPath(value: string) { const parts = value.split(/[\\/]/); return parts.length > 3 ? `…/${parts.slice(-3).join('/')}` : value; }
 function formatBytes(value: number) { if (value < 1024) return `${value} B`; if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`; return `${(value / 1024 ** 2).toFixed(1)} MB`; }
