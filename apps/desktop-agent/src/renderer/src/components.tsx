@@ -1,18 +1,73 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { cloneElement, Fragment, isValidElement } from 'react';
+import type { ButtonHTMLAttributes, ComponentPropsWithoutRef, ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { ConnectionState, ToolName } from '../../shared/types';
+import { splitLocalFilePathSegments } from './local-file-links';
 
 /** Renders chat content as Markdown with GFM tables/lists and syntax-highlighted
  *  code blocks — handles any text, code or formatting Max returns. */
 export function Markdown({ content }: { content: string }) {
   return (
     <div className="markdown">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+        components={markdownComponents}
+      >
         {content}
       </ReactMarkdown>
     </div>
+  );
+}
+
+const markdownComponents = {
+  p: ({ children, ...props }: ComponentPropsWithoutRef<'p'>) => <p {...props}>{renderLocalFilePathLinks(children)}</p>,
+  li: ({ children, ...props }: ComponentPropsWithoutRef<'li'>) => <li {...props}>{renderLocalFilePathLinks(children)}</li>,
+  td: ({ children, ...props }: ComponentPropsWithoutRef<'td'>) => <td {...props}>{renderLocalFilePathLinks(children)}</td>,
+  th: ({ children, ...props }: ComponentPropsWithoutRef<'th'>) => <th {...props}>{renderLocalFilePathLinks(children)}</th>,
+};
+
+function renderLocalFilePathLinks(node: ReactNode, keyPrefix = 'file-path'): ReactNode {
+  if (typeof node === 'string') {
+    return splitLocalFilePathSegments(node).map((segment, index) => (
+      typeof segment === 'string'
+        ? <Fragment key={`${keyPrefix}-text-${index}`}>{segment}</Fragment>
+        : <LocalFilePathLink key={`${keyPrefix}-path-${index}`} path={segment.path} />
+    ));
+  }
+
+  if (Array.isArray(node)) {
+    return node.map((child, index) => (
+      <Fragment key={`${keyPrefix}-node-${index}`}>{renderLocalFilePathLinks(child, `${keyPrefix}-${index}`)}</Fragment>
+    ));
+  }
+
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    const tagName = typeof node.type === 'string' ? node.type : '';
+    if (tagName === 'a' || tagName === 'button' || tagName === 'code' || tagName === 'pre') return node;
+    if (!node.props.children) return node;
+    return cloneElement(node, undefined, renderLocalFilePathLinks(node.props.children, `${keyPrefix}-child`));
+  }
+
+  return node;
+}
+
+function LocalFilePathLink({ path }: { path: string }) {
+  const open = async () => {
+    try {
+      await window.maxDesktop.openFile(path);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore imprevisto.';
+      window.alert(`Non riesco ad aprire il file:\n${path}\n\n${message}`);
+    }
+  };
+
+  return (
+    <button type="button" className="local-file-link" title={`Apri ${path}`} onClick={() => void open()}>
+      {path}
+    </button>
   );
 }
 

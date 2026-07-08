@@ -40,10 +40,10 @@ $token = $line.ToString().Substring(9)
 $bodyText = @"
 OnarSuite $($appPkg.version)
 
-- La creazione cliente da Max salva ora il contatto nell'Anagrafica OnarSuite con ruolo Cliente.
-- L'esito delle operazioni confermate nel Magic Panel entra nella cronologia della chat.
-- Migliorata la continuità della conversazione dopo cambio chat o riavvio dell'app.
-- Allineata la sezione Clienti nativa alla nuova Anagrafica unificata.
+- I percorsi file locali mostrati nelle risposte di Max sono ora cliccabili.
+- Un click su un PDF o altro file locale apre direttamente il file con l'app predefinita di Windows.
+- Il riconoscimento funziona anche sulle vecchie chat salvate, senza rigenerare la risposta.
+- Aggiunto un test dedicato per i risultati con file PDF in Download.
 
 Nota: per ridurre davvero i falsi positivi di SmartScreen/antivirus, firma il
 binario Windows con un certificato di code signing prima della distribuzione

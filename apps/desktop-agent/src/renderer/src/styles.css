@@ -334,6 +334,28 @@ h1, h2, h3, .brand strong { font-family: var(--font-display); font-weight: 600; 
 .markdown h1 { font-size: 20px; } .markdown h2 { font-size: 17px; } .markdown h3 { font-size: 15px; } .markdown h4 { font-size: 13px; }
 .markdown ul, .markdown ol { margin: 0 0 10px; padding-left: 22px; } .markdown li { margin: 3px 0; }
 .markdown a { color: var(--brand-ink); text-decoration: underline; text-underline-offset: 2px; }
+.markdown .local-file-link {
+  display: inline;
+  margin: 0;
+  padding: 1px 5px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: var(--hover);
+  color: var(--brand-ink);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: .92em;
+  line-height: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.markdown .local-file-link:hover {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+}
 .markdown strong { font-weight: 600; }
 .markdown blockquote { margin: 0 0 10px; padding: 4px 14px; border-left: 3px solid var(--brand); color: var(--muted); }
 .markdown hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
