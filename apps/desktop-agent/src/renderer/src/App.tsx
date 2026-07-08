@@ -1,5 +1,5 @@
 ﻿import { createElement, useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
-import type { AgentStreamEvent, AppSnapshot, AuditEntry, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
+import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import type { MemoryGraph, MemoryGraphNode } from '../../shared/types';
 import type { ProviderDescriptor, WorkspaceSearchResult } from '../../shared/workspace';
@@ -95,6 +95,7 @@ export function App() {
   const [lockWebPath, setLockWebPath] = useState<string>();
   const [outputs, setOutputs] = useState<PanelData[]>([]);
   const [selectedOutput, setSelectedOutput] = useState(0);
+  const [actionMessages, setActionMessages] = useState<Array<{ conversationId: string; item: ConsoleItem }>>([]);
   const [winW, setWinW] = useState(() => window.innerWidth);
   const [lockWidth, setLockWidth] = useState(() => Number(localStorage.getItem('max-lock-w')) || 440);
 
@@ -114,6 +115,13 @@ export function App() {
     setDockTab('output');
     setDockView((view) => (view === 'expanded' ? view : 'normal'));
   }, []);
+  const recordActionCompletion = useCallback((message: string) => {
+    if (!activeConv) return;
+    setActionMessages((current) => current.concat({
+      conversationId: activeConv.id,
+      item: { kind: 'assistant', id: crypto.randomUUID(), text: message },
+    }));
+  }, [activeConv]);
   const openWebDock = useCallback((nextPath?: string) => {
     setLockWebPath(nextPath);
     setDockTab('anteprima');
@@ -279,7 +287,7 @@ export function App() {
       {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
       {view === 'onarsuite' && <OnarHome onNotice={setNotice} onGoClients={() => setView('clients')} />}
       {view === 'clients' && <ClientsView />}
-      {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} onPersist={(items) => void persistConversation(activeConv.id, items)} onPanel={showPanel} onAssistantAction={(openUrl) => { const nextPath = openUrl ? new URL(openUrl).pathname + new URL(openUrl).search : undefined; openWebDock(nextPath); setNotice({ tone: 'success', text: 'Max ha preparato questa operazione nel pannello laterale.' }); }} onTitle={(id) => void titleConversation(id)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
+      {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} externalItems={actionMessages.filter((entry) => entry.conversationId === activeConv.id).map((entry) => entry.item)} onPersist={(items) => void persistConversation(activeConv.id, items)} onPanel={showPanel} onAssistantAction={(openUrl) => { const nextPath = openUrl ? new URL(openUrl).pathname + new URL(openUrl).search : undefined; openWebDock(nextPath); setNotice({ tone: 'success', text: 'Max ha preparato questa operazione nel pannello laterale.' }); }} onTitle={(id) => void titleConversation(id)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
       {view === 'workspace' && <WorkspaceView onNotice={setNotice} />}
       {view === 'graph' && <GraphView onNotice={setNotice} />}
@@ -288,7 +296,7 @@ export function App() {
       {view === 'logs' && <LogsView logs={logs} />}
       {view === 'settings' && <SettingsView snapshot={snapshot} busy={busy} onDisconnect={() => run(() => window.maxDesktop.disconnect())} onClear={() => run(() => window.maxDesktop.clearLocalData())} />}
     </main>
-    {dockView !== 'closed' && <WorkspaceDock view={dockView} tab={dockTab} snapshot={snapshot} files={files} logs={logs} serverUrl={snapshot.serverUrl} webPath={lockWebPath} outputs={outputs} selectedOutput={selectedOutput} onTab={openDockTab} onSelectOutput={setSelectedOutput} onRail={() => setDockView('rail')} onToggleExpand={() => setDockView((v) => (v === 'expanded' ? 'normal' : 'expanded'))} onClose={() => { setDockView('closed'); setLockWebPath(undefined); }} onResize={startLockResize} onAddFolder={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemoveFolder={(f) => run(() => window.maxDesktop.removeAuthorizedFolder(f))} onAnalyze={(f) => { setAttachments((a) => a.some((x) => x.path === f.path) ? a : a.concat(f)); setView('agent'); setNotice({ tone: 'success', text: `${f.name} pronto: scrivi a Max cosa farne.` }); }} onOpenLink={(url) => openWebDock(url)} onNotice={setNotice} />}
+    {dockView !== 'closed' && <WorkspaceDock view={dockView} tab={dockTab} snapshot={snapshot} files={files} logs={logs} serverUrl={snapshot.serverUrl} webPath={lockWebPath} outputs={outputs} selectedOutput={selectedOutput} onTab={openDockTab} onSelectOutput={setSelectedOutput} onRail={() => setDockView('rail')} onToggleExpand={() => setDockView((v) => (v === 'expanded' ? 'normal' : 'expanded'))} onClose={() => { setDockView('closed'); setLockWebPath(undefined); }} onResize={startLockResize} onAddFolder={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemoveFolder={(f) => run(() => window.maxDesktop.removeAuthorizedFolder(f))} onAnalyze={(f) => { setAttachments((a) => a.some((x) => x.path === f.path) ? a : a.concat(f)); setView('agent'); setNotice({ tone: 'success', text: `${f.name} pronto: scrivi a Max cosa farne.` }); }} onOpenLink={(url) => openWebDock(url)} onNotice={setNotice} onActionCompleted={recordActionCompletion} />}
   </div>;
 }
 
@@ -334,7 +342,7 @@ const SUGGESTIONS = [
   'Mostrami le attività di oggi',
 ];
 
-function AgentConsole({ convId, initialItems, onPersist, onPanel, onAssistantAction, onTitle, attachments, onAttachmentsChange, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; onPanel: (panel: PanelData) => void; onAssistantAction: (openUrl: string) => void; onTitle: (id: string) => void; attachments: LocalFile[]; onAttachmentsChange: (files: LocalFile[]) => void; onAfterRun: () => void; accountLabel?: string }) {
+function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel, onAssistantAction, onTitle, attachments, onAttachmentsChange, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; externalItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; onPanel: (panel: PanelData) => void; onAssistantAction: (openUrl: string) => void; onTitle: (id: string) => void; attachments: LocalFile[]; onAttachmentsChange: (files: LocalFile[]) => void; onAfterRun: () => void; accountLabel?: string }) {
   const [items, setItems] = useState<ConsoleItem[]>(initialItems);
   const [status, setStatus] = useState<string>();
   const [running, setRunning] = useState(false);
@@ -358,6 +366,14 @@ function AgentConsole({ convId, initialItems, onPersist, onPanel, onAssistantAct
 
   useEffect(() => { streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: 'smooth' }); }, [items, status]);
 
+  useEffect(() => {
+    setItems((current) => {
+      const known = new Set(current.map((item) => item.id));
+      const additions = externalItems.filter((item) => !known.has(item.id));
+      return additions.length ? current.concat(additions) : current;
+    });
+  }, [externalItems]);
+
   // Persist the transcript once a turn settles (history survives restarts).
   useEffect(() => {
     if (items.length > 0 && !running) {
@@ -375,7 +391,10 @@ function AgentConsole({ convId, initialItems, onPersist, onPanel, onAssistantAct
     setItems((prev) => [...prev, { kind: 'user', id: crypto.randomUUID(), text: message || '[allegati]' }]);
     setRunning(true); setStatus('Max sta pensando…');
     onAttachmentsChange([]);
-    try { await window.maxDesktop.runAgent({ message, history: [], filePaths, conversationId: convId }); }
+    const history: ChatMessage[] = items
+      .filter((item): item is Extract<ConsoleItem, { kind: 'user' | 'assistant' }> => item.kind === 'user' || item.kind === 'assistant')
+      .map((item) => ({ id: item.id, role: item.kind, content: item.text, createdAt: new Date().toISOString() }));
+    try { await window.maxDesktop.runAgent({ message, history, filePaths, conversationId: convId }); }
     catch (error) { setItems((prev) => [...prev, { kind: 'assistant', id: crypto.randomUUID(), text: `⚠ ${errorText(error)}` }]); setRunning(false); setStatus(undefined); }
     finally { onAfterRun(); }
   };
@@ -479,7 +498,7 @@ function WorkspaceDock(props: {
   serverUrl: string; webPath?: string; outputs: PanelData[]; selectedOutput: number;
   onTab: (t: DockTab) => void; onSelectOutput: (i: number) => void;
   onRail: () => void; onToggleExpand: () => void; onClose: () => void; onResize: (e: ReactMouseEvent) => void;
-  onAddFolder: () => void; onRemoveFolder: (f: string) => void; onAnalyze: (f: LocalFile) => void; onOpenLink: (url: string) => void; onNotice: (n: Notice) => void;
+  onAddFolder: () => void; onRemoveFolder: (f: string) => void; onAnalyze: (f: LocalFile) => void; onOpenLink: (url: string) => void; onNotice: (n: Notice) => void; onActionCompleted: (message: string) => void;
 }) {
   const { view, tab, snapshot, files, logs, serverUrl, webPath, outputs, selectedOutput } = props;
   if (view === 'rail') {
@@ -509,7 +528,7 @@ function WorkspaceDock(props: {
       {tab === 'contesto' && <DockContext snapshot={snapshot} files={files} />}
       {tab === 'file' && <DockFiles snapshot={snapshot} files={files} onAddFolder={props.onAddFolder} onRemoveFolder={props.onRemoveFolder} onAnalyze={props.onAnalyze} />}
       {tab === 'attivita' && <DockActivity logs={logs} />}
-      {tab === 'output' && <DockOutput outputs={outputs} selected={selectedOutput} onSelect={props.onSelectOutput} permissions={snapshot.permissions} onNotice={props.onNotice} onOpenLink={props.onOpenLink} />}
+      {tab === 'output' && <DockOutput outputs={outputs} selected={selectedOutput} onSelect={props.onSelectOutput} permissions={snapshot.permissions} onNotice={props.onNotice} onOpenLink={props.onOpenLink} onActionCompleted={props.onActionCompleted} />}
     </div>
   </aside>;
 }
@@ -576,16 +595,16 @@ function DockActivity({ logs }: { logs: AuditEntry[] }) {
   return <div className="dock-pane"><div className="dock-timeline">{logs.slice(0, 50).map((l) => <div key={l.id} className="dock-event"><span className={`dock-dot ${l.level}`} /><div className="dock-event-body"><strong>{l.message}</strong><small>{formatDate(l.createdAt)} · {l.eventType}</small></div></div>)}</div></div>;
 }
 
-function DockOutput({ outputs, selected, onSelect, permissions, onNotice, onOpenLink }: { outputs: PanelData[]; selected: number; onSelect: (i: number) => void; permissions: string[]; onNotice: (n: Notice) => void; onOpenLink: (url: string) => void }) {
+function DockOutput({ outputs, selected, onSelect, permissions, onNotice, onOpenLink, onActionCompleted }: { outputs: PanelData[]; selected: number; onSelect: (i: number) => void; permissions: string[]; onNotice: (n: Notice) => void; onOpenLink: (url: string) => void; onActionCompleted: (message: string) => void }) {
   if (!outputs.length) return <div className="dock-pane"><EmptyState icon="◆" title="Nessun output generato">Quando Max crea preventivi, PDF, documenti o codice, appariranno qui.</EmptyState></div>;
   const current = outputs[Math.min(selected, outputs.length - 1)];
   return <div className="dock-output">
     <div className="dock-output-list">{outputs.map((o, i) => <button key={i} className={i === selected ? 'active' : ''} onClick={() => onSelect(i)}><span className="dock-out-icon">{OUT_ICONS[o.kind] ?? '◆'}</span><span className="dock-out-title" title={o.title}>{o.title}</span></button>)}</div>
-    <div className="dock-output-view"><LockPreview panel={current} permissions={permissions} onNotice={onNotice} onOpenLink={onOpenLink} /></div>
+    <div className="dock-output-view"><LockPreview panel={current} permissions={permissions} onNotice={onNotice} onOpenLink={onOpenLink} onActionCompleted={onActionCompleted} /></div>
   </div>;
 }
 
-function LockPreview({ panel, permissions, onNotice, onOpenLink }: { panel: PanelData; permissions: string[]; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void; onOpenLink: (url: string) => void }) {
+function LockPreview({ panel, permissions, onNotice, onOpenLink, onActionCompleted }: { panel: PanelData; permissions: string[]; onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void; onOpenLink: (url: string) => void; onActionCompleted: (message: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(panel.text ?? '');
   useEffect(() => { setText(panel.text ?? ''); setEditing(false); }, [panel]);
@@ -600,7 +619,7 @@ function LockPreview({ panel, permissions, onNotice, onOpenLink }: { panel: Pane
     {panel.kind !== 'form' && <span className="side-panel-kind">{PANEL_LABELS[panel.kind]}</span>}
     <div className="side-panel-title"><strong>{panel.title}</strong>{panel.ok !== undefined && <span className={`pill ${panel.ok ? 'ok' : 'err'}`}>{panel.ok ? '✓' : '✗'}</span>}</div>
     {panel.subtitle && <p className="side-panel-sub">{panel.subtitle}</p>}
-    {panel.kind === 'form' && <ActionFormRenderer panel={panel} grantedPermissions={permissions} onNotice={onNotice} />}
+    {panel.kind === 'form' && <ActionFormRenderer panel={panel} grantedPermissions={permissions} onNotice={onNotice} onCompleted={onActionCompleted} />}
     {panel.fields && panel.fields.length > 0 && <dl className="side-panel-fields">{panel.fields.map((f) => <div key={f.label}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>}
     {panel.columns && panel.rows && <div className="side-panel-table"><div className="data-row head" style={{ gridTemplateColumns: panel.columns.map(() => 'minmax(0,1fr)').join(' ') }}>{panel.columns.map((c) => <span key={c}>{c}</span>)}</div>{panel.rows.map((row, i) => <div className="data-row" key={i} style={{ gridTemplateColumns: panel.columns!.map(() => 'minmax(0,1fr)').join(' ') }}>{row.map((cell, j) => <span key={j} title={cell}>{cell}</span>)}</div>)}</div>}
     {panel.links && panel.links.length > 0 && <div className="result-carousel" role="list">
@@ -717,10 +736,10 @@ const MODULES: ModuleDef[] = [
     fields: [{ key: 'title', label: 'Titolo', required: true }, { key: 'date', label: 'Scadenza', type: 'date' }, { key: 'priority', label: 'Priorità', placeholder: 'low · medium · high' }, { key: 'description', label: 'Note', type: 'textarea' }],
     rowActions: [{ label: '✓ Completa', action: 'complete_reminder' }] },
   { id: 'leads', label: 'Clienti', icon: '◎', hint: 'CRM e contatti',
-    listAction: 'list_leads', listKey: 'leads',
-    columns: [{ key: 'name', label: 'Nome' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Telefono' }],
-    createAction: 'create_customer', createLabel: 'Nuovo cliente',
-    fields: [{ key: 'name', label: 'Nome', required: true }, { key: 'email', label: 'Email', type: 'email' }, { key: 'phone', label: 'Telefono' }, { key: 'notes', label: 'Note', type: 'textarea' }] },
+    listAction: 'list_unified_contacts', listKey: 'contacts',
+    columns: [{ key: 'display_name', label: 'Nome' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Telefono' }],
+    createAction: 'create_unified_contact', createLabel: 'Nuovo cliente',
+    fields: [{ key: 'name', label: 'Nome completo', required: true }, { key: 'email', label: 'Email', type: 'email', required: true }, { key: 'phone', label: 'Telefono' }, { key: 'notes', label: 'Note', type: 'textarea' }] },
   { id: 'contracts', label: 'Contratti', icon: '▤', hint: 'Contratti e bozze',
     listAction: 'contract_list', listKey: 'contracts',
     columns: [{ key: 'title', label: 'Titolo' }, { key: 'client', label: 'Cliente' }, { key: 'status', label: 'Stato' }, { key: 'amount', label: 'Importo', kind: 'amount' }],
@@ -784,6 +803,7 @@ function ModuleScreen({ def, onBack, onNotice }: { def: ModuleDef; onBack: () =>
       const v = (form[f.key] ?? '').trim();
       if (v) payload[f.key] = f.type === 'number' ? Number(v) : v;
     }
+    if (def.createAction === 'create_unified_contact') payload.functions = ['customer'];
     const res = await window.maxDesktop.onar(def.createAction, payload);
     setBusy(false);
     if (res.success) { onNotice({ tone: 'success', text: res.message }); setShowForm(false); setForm({}); void load(); }
@@ -1104,10 +1124,10 @@ function ClientsView() {
     setLoading(true);
     const [usersRes, leadsRes] = await Promise.all([
       window.maxDesktop.onar('list_users', { limit: 30 }),
-      window.maxDesktop.onar('list_leads', { limit: 30 }),
+      window.maxDesktop.onar('list_unified_contacts', { limit: 30 }),
     ]);
     if (usersRes.success) setUsers(((usersRes.data as { users?: Array<Record<string, unknown>> } | undefined)?.users) ?? []);
-    if (leadsRes.success) setLeads(((leadsRes.data as { leads?: Array<Record<string, unknown>> } | undefined)?.leads) ?? []);
+    if (leadsRes.success) setLeads(((leadsRes.data as { contacts?: Array<Record<string, unknown>> } | undefined)?.contacts) ?? []);
     setLoading(false);
   }, []);
 
@@ -1131,11 +1151,12 @@ function ClientsView() {
   const submitLead = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    const res = await window.maxDesktop.onar('create_customer', {
+    const res = await window.maxDesktop.onar('create_unified_contact', {
       name: leadForm.name,
       email: leadForm.email || undefined,
       phone: leadForm.phone || undefined,
       notes: leadForm.notes || undefined,
+      functions: ['customer'],
     });
     setBusy(false);
     if (res.success) {
@@ -1154,7 +1175,7 @@ function ClientsView() {
       </Card>
       <div className="stats-grid">
         <Card><span className="stat-label">Utenti</span><strong className="stat-value">{users.length}</strong><small>Team e accessi</small></Card>
-        <Card><span className="stat-label">Lead</span><strong className="stat-value">{leads.length}</strong><small>Clienti potenziali</small></Card>
+        <Card><span className="stat-label">Clienti</span><strong className="stat-value">{leads.length}</strong><small>Anagrafiche cliente</small></Card>
         <Card><span className="stat-label">Stato</span><strong className="stat-value">Live</strong><small>Dal backend di OnarSuite</small></Card>
       </div>
       <div className="clients-columns">
@@ -1178,25 +1199,25 @@ function ClientsView() {
             <Button disabled={busy}>{busy ? 'Salvataggio...' : 'Crea utente'}</Button>
           </form>
         </Card>
-        <Card title="Lead / anagrafiche">
+        <Card title="Anagrafiche clienti">
           {loading ? <p className="muted-line">Carico clienti...</p> : (
             <div className="data-table compact">
               {leads.map((lead) => (
                 <div key={String(lead.id)} className="data-row">
-                  <strong>{String(lead.name ?? '—')}</strong>
+                  <strong>{String(lead.display_name ?? '—')}</strong>
                   <span>{String(lead.email ?? '—')}</span>
                   <span>{String(lead.phone ?? '—')}</span>
                 </div>
               ))}
-              {!leads.length && <EmptyState icon="◉" title="Nessun lead">Non ci sono lead da mostrare.</EmptyState>}
+              {!leads.length && <EmptyState icon="◉" title="Nessun cliente">Non ci sono clienti da mostrare.</EmptyState>}
             </div>
           )}
           <form className="module-form" onSubmit={submitLead}>
             <label>Nome<input value={leadForm.name} onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })} required /></label>
-            <label>Email<input value={leadForm.email} onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })} /></label>
+            <label>Email<input type="email" value={leadForm.email} onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })} required /></label>
             <label>Telefono<input value={leadForm.phone} onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })} /></label>
             <label>Note<textarea value={leadForm.notes} onChange={(e) => setLeadForm({ ...leadForm, notes: e.target.value })} rows={3} /></label>
-            <Button disabled={busy}>{busy ? 'Salvataggio...' : 'Crea lead'}</Button>
+            <Button disabled={busy}>{busy ? 'Salvataggio...' : 'Crea cliente'}</Button>
           </form>
         </Card>
       </div>

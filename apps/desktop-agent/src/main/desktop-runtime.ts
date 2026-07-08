@@ -385,8 +385,14 @@ export class DesktopRuntime {
       return;
     }
 
+    if (input.conversationId && this.activeConvId !== input.conversationId) {
+      await this.selectConversation(input.conversationId);
+    }
+    this.engine.mergePlainHistory(input.history);
+
     const assistantOutcome = await this.assistantActions.handleMessage(input.conversationId, message);
     if (assistantOutcome) {
+      this.engine.recordExchange(message, assistantOutcome.text);
       emit({ type: 'assistant', runId: 'assistant', text: assistantOutcome.text });
       if (assistantOutcome.panel) emit({ type: 'form', runId: 'assistant', panel: assistantOutcome.panel });
       if (assistantOutcome.action) {

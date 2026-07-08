@@ -3,19 +3,20 @@ import type { ActionDefinition } from '../../shared/types';
 /** Local, versioned fallback. The backend catalog remains the source of truth. */
 export const LOCAL_ACTION_CATALOG: ActionDefinition[] = [
   {
-    id: 'clients.create', label: 'Crea cliente', description: 'Crea un contatto CRM.', skill: 'CRM', mode: 'create',
-    route: '/bookings/customers', actionType: 'create_customer', requiredFields: ['name', 'email'],
-    optionalFields: ['phone', 'notes'], permissions: ['create-booking-customers'], confirmationRequired: true,
+    id: 'clients.create', label: 'Crea cliente', description: 'Crea un cliente nell\'Anagrafica OnarSuite.', skill: 'CRM', mode: 'create',
+    route: '/clienti/anagrafica', actionType: 'create_unified_contact', requiredFields: ['name', 'email'],
+    optionalFields: ['phone', 'notes'], permissions: ['create-customers'], confirmationRequired: true,
     resultPanelKind: 'customer', aliases: ['crea cliente', 'nuovo cliente', 'aggiungi cliente', 'create customer'],
     fieldSchema: [
       { key: 'name', label: 'Nome completo', required: true }, { key: 'email', label: 'Email', type: 'email', required: true },
+      { key: 'functions', label: 'Ruolo', type: 'select', required: true, options: [{ label: 'Cliente', value: 'customer' }] },
       { key: 'phone', label: 'Telefono', type: 'tel' }, { key: 'notes', label: 'Note', type: 'textarea' },
     ],
   },
   {
     id: 'clients.list', label: 'Apri clienti', description: 'Apre l’elenco clienti.', skill: 'CRM', mode: 'view',
-    route: '/bookings/customers', actionType: 'list_leads', requiredFields: [], optionalFields: [], fieldSchema: [],
-    permissions: ['manage-booking-customers'], confirmationRequired: false,
+    route: '/clienti/anagrafica', actionType: 'list_unified_contacts', requiredFields: [], optionalFields: [], fieldSchema: [],
+    permissions: ['create-customers'], confirmationRequired: false,
     aliases: ['mostrami i clienti', 'apri clienti', 'vai ai clienti', 'elenca clienti', 'lista clienti'],
   },
   {

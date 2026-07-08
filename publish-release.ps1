@@ -40,13 +40,10 @@ $token = $line.ToString().Substring(9)
 $bodyText = @"
 OnarSuite $($appPkg.version)
 
-- Nuovo Owner Memory Engine locale con scansione incrementale delle cartelle autorizzate.
-- Indice persistente, ricerca keyword, schede OSMEM e contesto AI con budget token.
-- Parsing e chunking locali per PDF, DOCX, XLSX, CSV, TXT e Markdown.
-- Privacy local-first: nessun contenuto indicizzato viene inviato automaticamente al cloud.
-
-- Controllo periodico silenzioso e download automatico in background.
-- Avanzamento visibile senza interrompere il lavoro e riavvio esplicito quando la release è pronta.
+- La creazione cliente da Max salva ora il contatto nell'Anagrafica OnarSuite con ruolo Cliente.
+- L'esito delle operazioni confermate nel Magic Panel entra nella cronologia della chat.
+- Migliorata la continuità della conversazione dopo cambio chat o riavvio dell'app.
+- Allineata la sezione Clienti nativa alla nuova Anagrafica unificata.
 
 Nota: per ridurre davvero i falsi positivi di SmartScreen/antivirus, firma il
 binario Windows con un certificato di code signing prima della distribuzione

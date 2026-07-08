@@ -366,6 +366,7 @@ function sanitizePrefill(action: string, fields: Record<string, string>): Record
       if (fields.email) prefill.email = fields.email.trim();
       if (fields.phone) prefill.phone = fields.phone.trim();
       if (fields.notes) prefill.notes = fields.notes.trim();
+      prefill.functions = 'customer';
       break;
     case 'contracts.create':
       if (fields.subject) prefill.subject = fields.subject.trim();

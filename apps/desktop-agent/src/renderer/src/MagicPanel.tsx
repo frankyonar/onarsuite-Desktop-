@@ -4,10 +4,11 @@ import { Button } from './components';
 
 type Notice = { tone: 'success' | 'error' | 'warning'; text: string };
 
-export function ActionFormRenderer({ panel, grantedPermissions, onNotice }: {
+export function ActionFormRenderer({ panel, grantedPermissions, onNotice, onCompleted }: {
   panel: PanelData;
   grantedPermissions: string[];
   onNotice: (notice: Notice) => void;
+  onCompleted?: (message: string) => void;
 }) {
   const initial = useMemo(() => Object.fromEntries(Object.entries(panel.values ?? {}).map(([key, value]) => [key, value == null ? '' : String(value)])), [panel]);
   const [values, setValues] = useState<Record<string, string>>(initial);
@@ -43,6 +44,7 @@ export function ActionFormRenderer({ panel, grantedPermissions, onNotice }: {
       setCompleted(result.message);
       setReviewing(false);
       onNotice({ tone: 'success', text: result.message });
+      onCompleted?.(result.message);
     } else onNotice({ tone: 'error', text: result.message });
   };
 

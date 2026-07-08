@@ -12,6 +12,11 @@ describe('Action Catalog', () => {
     }
     expect(catalog['quotes.create'].route).toBe('/sales-proposals/create');
     expect(catalog['quotes.create'].mode).toBe('view');
+    expect(catalog['clients.create'].actionType).toBe('create_unified_contact');
+    expect(catalog['clients.create'].route).toBe('/clienti/anagrafica');
+    expect(catalog['clients.create'].fieldSchema.find((field) => field.key === 'functions')?.options).toEqual([
+      { label: 'Cliente', value: 'customer' },
+    ]);
   });
 
   it('detects create and view intents from catalog aliases', () => {

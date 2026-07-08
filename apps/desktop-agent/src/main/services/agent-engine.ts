@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentMessage, AgentStreamEvent, PanelData, PanelField, ToolName } from '../../shared/types';
+import type { AgentMessage, AgentStreamEvent, ChatMessage, PanelData, PanelField, ToolName } from '../../shared/types';
 import type { AuditLog } from './audit-log';
 import type { AgentSdk } from './agent-sdk';
 import type { AgentTools } from './tools';
@@ -80,6 +80,30 @@ export class AgentEngine {
   /** Snapshot the current LLM context to persist with the conversation. */
   getMessages(): AgentMessage[] {
     return [...this.messages];
+  }
+
+  /** Merge chat entries produced outside the tool loop, such as a confirmed form. */
+  mergePlainHistory(history: ChatMessage[]): void {
+    const incoming = history
+      .filter((item) => item.role === 'user' || item.role === 'assistant')
+      .map((item) => ({ role: item.role, content: item.content.trim() }))
+      .filter((item) => item.content);
+    if (!incoming.length) return;
+
+    const current = this.messages
+      .filter((item) => item.role !== 'tool' && typeof item.content === 'string' && item.content.trim())
+      .map((item) => ({ role: item.role, content: String(item.content).trim() }));
+    let matched = 0;
+    for (const item of current) {
+      if (matched < incoming.length && item.role === incoming[matched].role && item.content === incoming[matched].content) matched++;
+    }
+    for (const item of incoming.slice(matched)) this.messages.push(item);
+  }
+
+  /** Record deterministic assistant workflows that bypass the model loop. */
+  recordExchange(userMessage: string, assistantMessage: string): void {
+    this.messages.push({ role: 'user', content: userMessage });
+    this.messages.push({ role: 'assistant', content: assistantMessage });
   }
 
   cancel(): void {
