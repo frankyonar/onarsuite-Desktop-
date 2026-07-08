@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.42', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.43', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', planName: 'PRO', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -149,6 +149,13 @@ export function createPreviewApi(): MaxDesktopApi {
     searchMemory: async () => [],
     getMemoryCard: async (fileId) => `OSMEM/1.0\n@node file:${fileId}\npermissions:\nlocal_only = true\nsend_to_cloud = ask`,
     getMemoryContext: async (query, level = 'medium') => ({ query, budgetTokens: level === 'simple' ? 1000 : level === 'advanced' ? 12000 : 4000, estimatedTokens: 0, truncated: false, fileIds: [], context: '' }),
+    snapshotMemory: async (label) => ({ id: 'snap-preview', createdAt: new Date().toISOString(), label, records: 2 }),
+    listMemorySnapshots: async () => [
+      { id: 'snap-1', createdAt: new Date(Date.now() - 3600000).toISOString(), label: 'Prima della scansione', records: 2 },
+      { id: 'snap-2', createdAt: new Date(Date.now() - 86400000).toISOString(), records: 5 },
+    ],
+    restoreMemorySnapshot: async (id) => ({ id, createdAt: new Date().toISOString(), records: 2 }),
+    deleteMemorySnapshot: async () => undefined,
     getMemoryGraph: async () => ({
       nodes: [
         { id: 'entity:email:mario@rossi.it', kind: 'entity', label: 'mario@rossi.it', entityType: 'email', weight: 3 },

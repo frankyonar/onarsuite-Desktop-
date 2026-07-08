@@ -1,7 +1,7 @@
 ﻿import { createElement, useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
-import type { MemoryGraph, MemoryGraphNode } from '../../shared/types';
+import type { MemoryGraph, MemoryGraphNode, MemorySnapshotMeta } from '../../shared/types';
 import type { ProviderDescriptor, WorkspaceSearchResult } from '../../shared/workspace';
 import { AppLogo, BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard } from './components';
 import { ActionFormRenderer } from './MagicPanel';
@@ -1080,7 +1080,40 @@ function FoldersView({ snapshot, busy, onAdd, onRemove, onDrop, onChoose }: { sn
 
 function LogsView({ logs }: { logs: AuditEntry[] }) { return <Card title="Registro attività" eyebrow="AUDIT LOCALE"><div className="log-table"><div className="log-row head"><span>Data</span><span>Evento</span><span>Livello</span><span>Messaggio</span></div>{logs.map((log) => <div className="log-row" key={log.id}><span>{formatDate(log.createdAt)}</span><code>{log.eventType}</code><span><i className={`log-dot ${log.level}`} />{log.level}</span><strong>{log.message}</strong></div>)}</div>{!logs.length && <EmptyState icon="≡" title="Registro vuoto">Le azioni e gli errori compariranno qui.</EmptyState>}</Card>; }
 
-function SettingsView({ snapshot, busy, onDisconnect, onClear }: { snapshot: AppSnapshot; busy: boolean; onDisconnect: () => void; onClear: () => void }) { return <div className="page-grid settings-grid"><Card title="Dispositivo"><dl><dt>Nome</dt><dd>{snapshot.deviceName}</dd><dt>ID dispositivo</dt><dd>{snapshot.deviceId}</dd><dt>Server</dt><dd>{snapshot.serverUrl}</dd><dt>Versione</dt><dd>{snapshot.appVersion}</dd><dt>Token locale</dt><dd>{snapshot.encryptionAvailable ? 'Cifrato con il sistema operativo' : 'Non persistito'}</dd></dl><Button variant="danger" disabled={busy} onClick={onDisconnect}>Disconnetti dispositivo</Button></Card><Card title="Privacy e dati locali"><p>Puoi cancellare configurazione, token, coda offline e audit locale. I documenti nelle cartelle autorizzate non vengono eliminati automaticamente.</p><Button variant="secondary" disabled={busy} onClick={onClear}>Cancella dati locali</Button></Card></div>; }
+function SettingsView({ snapshot, busy, onDisconnect, onClear }: { snapshot: AppSnapshot; busy: boolean; onDisconnect: () => void; onClear: () => void }) { return <div className="page-grid settings-grid"><Card title="Dispositivo"><dl><dt>Nome</dt><dd>{snapshot.deviceName}</dd><dt>ID dispositivo</dt><dd>{snapshot.deviceId}</dd><dt>Server</dt><dd>{snapshot.serverUrl}</dd><dt>Versione</dt><dd>{snapshot.appVersion}</dd><dt>Token locale</dt><dd>{snapshot.encryptionAvailable ? 'Cifrato con il sistema operativo' : 'Non persistito'}</dd></dl><Button variant="danger" disabled={busy} onClick={onDisconnect}>Disconnetti dispositivo</Button></Card><MemorySnapshots /><Card title="Privacy e dati locali"><p>Puoi cancellare configurazione, token, coda offline e audit locale. I documenti nelle cartelle autorizzate non vengono eliminati automaticamente.</p><Button variant="secondary" disabled={busy} onClick={onClear}>Cancella dati locali</Button></Card></div>; }
+
+function MemorySnapshots() {
+  const [snaps, setSnaps] = useState<MemorySnapshotMeta[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string>();
+
+  const refresh = useCallback(async () => {
+    try { setSnaps(await window.maxDesktop.listMemorySnapshots()); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const wrap = async (fn: () => Promise<unknown>, done: string) => {
+    setBusy(true); setMsg(undefined);
+    try { await fn(); await refresh(); setMsg(done); }
+    catch (error) { setMsg(errorText(error)); }
+    finally { setBusy(false); }
+  };
+
+  return <Card title="Snapshot memoria" eyebrow="ROLLBACK LOCALE" action={<Button disabled={busy} onClick={() => void wrap(() => window.maxDesktop.snapshotMemory(), 'Snapshot creato.')}>Crea snapshot</Button>}>
+    <p className="muted-line">Salva lo stato dell'indice della memoria locale e ripristinalo in caso di scansioni indesiderate. I file non vengono toccati.</p>
+    <div className="snap-list">
+      {snaps.map((snap) => <div key={snap.id} className="snap-row">
+        <div><strong>{snap.label ?? 'Snapshot'}</strong><small>{formatDate(snap.createdAt)} · {snap.records} file</small></div>
+        <div className="snap-actions">
+          <Button variant="secondary" disabled={busy} onClick={() => void wrap(() => window.maxDesktop.restoreMemorySnapshot(snap.id), 'Memoria ripristinata.')}>Ripristina</Button>
+          <Button variant="ghost" disabled={busy} onClick={() => void wrap(() => window.maxDesktop.deleteMemorySnapshot(snap.id), 'Snapshot eliminato.')}>×</Button>
+        </div>
+      </div>)}
+      {!snaps.length && <p className="muted-line">Nessuno snapshot. Creane uno prima di una scansione importante.</p>}
+    </div>
+    {msg && <small className="snap-msg">{msg}</small>}
+  </Card>;
+}
 
 function UpdateBanner({ state, busy, onAction }: { state: UpdateState; busy: boolean; onAction: () => void }) {
   if (state.status === 'disabled' || state.status === 'idle') return null;

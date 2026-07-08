@@ -8,7 +8,7 @@ import type {
   WorkspaceStatus,
 } from './workspace';
 
-export const APP_VERSION = '0.9.42';
+export const APP_VERSION = '0.9.43';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -313,6 +313,14 @@ export interface MemoryFileRecord {
   embedding?: Array<[number, number]>;
 }
 
+/** Metadata for a saved point-in-time copy of the memory index. */
+export interface MemorySnapshotMeta {
+  id: string;
+  createdAt: string;
+  label?: string;
+  records: number;
+}
+
 export interface MemoryScanResult {
   roots: string[];
   discovered: number;
@@ -439,6 +447,10 @@ export interface MaxDesktopApi {
   getMemoryCard(fileId: string): Promise<string>;
   getMemoryContext(query: string, level?: MemoryBudgetLevel): Promise<MemoryContextResult>;
   getMemoryGraph(options?: MemoryGraphOptions): Promise<MemoryGraph>;
+  snapshotMemory(label?: string): Promise<MemorySnapshotMeta>;
+  listMemorySnapshots(): Promise<MemorySnapshotMeta[]>;
+  restoreMemorySnapshot(id: string): Promise<MemorySnapshotMeta>;
+  deleteMemorySnapshot(id: string): Promise<void>;
   // --- Virtual Workspace (unified layer over local memory, cloud, connectors) ---
   listWorkspaceProviders(): Promise<ProviderDescriptor[]>;
   getWorkspaceStatus(): Promise<WorkspaceStatus>;

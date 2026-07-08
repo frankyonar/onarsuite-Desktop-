@@ -14,6 +14,7 @@ import type {
   MemoryScanResult,
   MemorySearchOptions,
   MemorySearchResult,
+  MemorySnapshotMeta,
 } from '../../../shared/types';
 import { isSupportedFile, parseDocument } from '../document-parser';
 import { HashingEmbedder, recordEmbeddingText, toSparse } from '../workspace/embeddings';
@@ -35,6 +36,7 @@ const IGNORED_DIRECTORIES = new Set([
 ]);
 const IGNORED_FILE_SUFFIXES = ['.tmp', '.temp', '.swp', '.swo', '.part', '.crdownload', '~'];
 const MAX_CONTENT_INDEX_BYTES = 25 * 1024 * 1024;
+const MAX_SNAPSHOTS = 20;
 
 export class OnarOwnerMemoryEngine {
   private readonly indexPath: string;
@@ -176,6 +178,70 @@ export class OnarOwnerMemoryEngine {
     const index = await this.readIndex();
     const records = index.records.filter((record) => !isInside(record.path, path.resolve(root)));
     if (records.length !== index.records.length) await this.writeIndex({ ...index, records });
+  }
+
+  // --- Snapshot / rollback of the memory index (Fase 2) ---
+
+  /** Save a point-in-time copy of the current index. Oldest are pruned past the cap. */
+  async snapshot(label?: string): Promise<MemorySnapshotMeta> {
+    const index = await this.readIndex();
+    const createdAt = new Date().toISOString();
+    const id = `snap-${createdAt.replace(/[:.]/g, '-')}`;
+    const dir = this.snapshotsDir();
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, `${id}.json`), JSON.stringify(index), { encoding: 'utf8', mode: 0o600 });
+
+    const meta: MemorySnapshotMeta = { id, createdAt, label: label?.trim() || undefined, records: index.records.length };
+    const manifest = [meta, ...(await this.readManifest()).filter((item) => item.id !== id)];
+    const kept = manifest.slice(0, MAX_SNAPSHOTS);
+    for (const pruned of manifest.slice(MAX_SNAPSHOTS)) {
+      await rm(path.join(dir, `${pruned.id}.json`), { force: true });
+    }
+    await this.writeManifest(kept);
+    return meta;
+  }
+
+  async listSnapshots(): Promise<MemorySnapshotMeta[]> {
+    return this.readManifest();
+  }
+
+  /** Replace the current index with a saved snapshot. */
+  async restoreSnapshot(id: string): Promise<MemorySnapshotMeta> {
+    const meta = (await this.readManifest()).find((item) => item.id === id);
+    if (!meta) throw new Error('Snapshot non trovato.');
+    let stored: StoredMemoryIndex;
+    try {
+      stored = JSON.parse(await readFile(path.join(this.snapshotsDir(), `${id}.json`), 'utf8')) as StoredMemoryIndex;
+    } catch {
+      throw new Error('File dello snapshot mancante o illeggibile.');
+    }
+    if (stored.version !== 1 || !Array.isArray(stored.records)) throw new Error('Snapshot non valido.');
+    await this.writeIndex(stored);
+    this.status = { state: 'idle', totalFiles: stored.records.length, processedFiles: stored.records.length, indexedFiles: stored.records.length, lastScan: stored.lastScan };
+    return meta;
+  }
+
+  async deleteSnapshot(id: string): Promise<void> {
+    await rm(path.join(this.snapshotsDir(), `${id}.json`), { force: true });
+    await this.writeManifest((await this.readManifest()).filter((item) => item.id !== id));
+  }
+
+  private snapshotsDir(): string {
+    return path.join(path.dirname(this.indexPath), 'snapshots');
+  }
+
+  private async readManifest(): Promise<MemorySnapshotMeta[]> {
+    try {
+      const parsed = JSON.parse(await readFile(path.join(this.snapshotsDir(), 'manifest.json'), 'utf8'));
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private async writeManifest(manifest: MemorySnapshotMeta[]): Promise<void> {
+    await mkdir(this.snapshotsDir(), { recursive: true });
+    await writeFile(path.join(this.snapshotsDir(), 'manifest.json'), JSON.stringify(manifest), { encoding: 'utf8', mode: 0o600 });
   }
 
   private async runScan(roots: string[]): Promise<MemoryScanResult> {

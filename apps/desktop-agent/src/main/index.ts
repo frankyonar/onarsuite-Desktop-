@@ -93,6 +93,10 @@ function registerIpc(): void {
   ipcMain.handle('memory:card', (_event, fileId: string) => runtime.getMemoryCard(fileId));
   ipcMain.handle('memory:context', (_event, query: string, level) => runtime.getMemoryContext(query, level));
   ipcMain.handle('memory:graph', (_event, options) => runtime.getMemoryGraph(options));
+  ipcMain.handle('memory:snapshot', (_event, label?: string) => runtime.snapshotMemory(label));
+  ipcMain.handle('memory:snapshots', () => runtime.listMemorySnapshots());
+  ipcMain.handle('memory:restore', (_event, id: string) => runtime.restoreMemorySnapshot(id));
+  ipcMain.handle('memory:snapshot-delete', (_event, id: string) => runtime.deleteMemorySnapshot(id));
   ipcMain.handle('workspace:providers', () => runtime.listWorkspaceProviders());
   ipcMain.handle('workspace:status', () => runtime.getWorkspaceStatus());
   ipcMain.handle('workspace:search', (_event, query: string, options) => runtime.searchWorkspace(query, options));

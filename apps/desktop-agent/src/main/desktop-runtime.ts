@@ -2,7 +2,7 @@ import { dialog, safeStorage, shell } from 'electron';
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type ConsoleItem, type Conversation, type ConversationMeta, type FileAction, type FileContent, type FsEntry, type LocalFile, type MemoryBudgetLevel, type MemoryContextResult, type MemoryEngineStatus, type MemoryGraph, type MemoryGraphOptions, type MemoryScanResult, type MemorySearchOptions, type MemorySearchResult, type PairingInput } from '../shared/types';
+import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type ConsoleItem, type Conversation, type ConversationMeta, type FileAction, type FileContent, type FsEntry, type LocalFile, type MemoryBudgetLevel, type MemoryContextResult, type MemoryEngineStatus, type MemoryGraph, type MemoryGraphOptions, type MemoryScanResult, type MemorySearchOptions, type MemorySearchResult, type MemorySnapshotMeta, type PairingInput } from '../shared/types';
 import { isAllowedPath } from '../shared/path-policy';
 import { AgentSdk, NetworkError, RevokedDeviceError } from './services/agent-sdk';
 import { AgentEngine } from './services/agent-engine';
@@ -600,6 +600,27 @@ export class DesktopRuntime {
 
   getMemoryGraph(options?: MemoryGraphOptions): Promise<MemoryGraph> {
     return this.memory.graph(options);
+  }
+
+  async snapshotMemory(label?: string): Promise<MemorySnapshotMeta> {
+    const meta = await this.memory.snapshot(label);
+    await this.audit.write('memory_snapshot_created', 'info', 'Snapshot memoria creato', { id: meta.id, records: meta.records });
+    return meta;
+  }
+
+  listMemorySnapshots(): Promise<MemorySnapshotMeta[]> {
+    return this.memory.listSnapshots();
+  }
+
+  async restoreMemorySnapshot(id: string): Promise<MemorySnapshotMeta> {
+    const meta = await this.memory.restoreSnapshot(id);
+    await this.audit.write('memory_snapshot_restored', 'warning', 'Memoria ripristinata da snapshot', { id: meta.id, records: meta.records });
+    return meta;
+  }
+
+  async deleteMemorySnapshot(id: string): Promise<void> {
+    await this.memory.deleteSnapshot(id);
+    await this.audit.write('memory_snapshot_deleted', 'info', 'Snapshot memoria eliminato', { id });
   }
 
   // --- Virtual Workspace (unified layer over local memory, cloud, connectors) ---
