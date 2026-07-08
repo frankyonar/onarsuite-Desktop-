@@ -181,6 +181,16 @@ export class OnarOwnerMemoryEngine {
     if (records.length !== index.records.length) await this.writeIndex({ ...index, records });
   }
 
+  /** Update a file's privacy flags (granular user control over what the AI sees). */
+  async setPrivacy(fileId: string, patch: Partial<MemoryFileRecord['privacy']>): Promise<MemoryFileRecord> {
+    const index = await this.readIndex();
+    const record = index.records.find((item) => item.id === fileId);
+    if (!record) throw new Error('File non presente nella memoria locale.');
+    record.privacy = { ...record.privacy, ...patch };
+    await this.writeIndex(index);
+    return record;
+  }
+
   // --- Snapshot / rollback of the memory index (Fase 2) ---
 
   /** Save a point-in-time copy of the current index. Oldest are pruned past the cap. */

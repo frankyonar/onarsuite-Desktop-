@@ -2,7 +2,7 @@ import { dialog, safeStorage, shell } from 'electron';
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type ConsoleItem, type Conversation, type ConversationMeta, type FileAction, type FileContent, type FsEntry, type LocalFile, type MemoryBudgetLevel, type MemoryContextResult, type MemoryEngineStatus, type MemoryGraph, type MemoryGraphOptions, type MemoryScanResult, type MemorySearchOptions, type MemorySearchResult, type MemorySnapshotMeta, type PairingInput } from '../shared/types';
+import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type ConsoleItem, type Conversation, type ConversationMeta, type FileAction, type FileContent, type FsEntry, type LocalFile, type MemoryBudgetLevel, type MemoryContextResult, type MemoryEngineStatus, type MemoryFileRecord, type MemoryGraph, type MemoryGraphOptions, type MemoryScanResult, type MemorySearchOptions, type MemorySearchResult, type MemorySnapshotMeta, type PairingInput } from '../shared/types';
 import { isAllowedPath } from '../shared/path-policy';
 import { AgentSdk, NetworkError, RevokedDeviceError } from './services/agent-sdk';
 import { AgentEngine } from './services/agent-engine';
@@ -621,6 +621,11 @@ export class DesktopRuntime {
   async deleteMemorySnapshot(id: string): Promise<void> {
     await this.memory.deleteSnapshot(id);
     await this.audit.write('memory_snapshot_deleted', 'info', 'Snapshot memoria eliminato', { id });
+  }
+
+  async setMemoryPrivacy(fileId: string, patch: Partial<MemoryFileRecord['privacy']>): Promise<void> {
+    const record = await this.memory.setPrivacy(fileId, patch);
+    await this.audit.write('memory_privacy_updated', 'security', 'Privacy file aggiornata', { filename: record.name, changes: Object.keys(patch).join(', ') });
   }
 
   // --- Virtual Workspace (unified layer over local memory, cloud, connectors) ---

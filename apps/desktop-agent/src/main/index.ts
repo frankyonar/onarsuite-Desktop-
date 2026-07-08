@@ -97,6 +97,7 @@ function registerIpc(): void {
   ipcMain.handle('memory:snapshots', () => runtime.listMemorySnapshots());
   ipcMain.handle('memory:restore', (_event, id: string) => runtime.restoreMemorySnapshot(id));
   ipcMain.handle('memory:snapshot-delete', (_event, id: string) => runtime.deleteMemorySnapshot(id));
+  ipcMain.handle('memory:set-privacy', (_event, fileId: string, patch) => runtime.setMemoryPrivacy(fileId, patch ?? {}));
   ipcMain.handle('workspace:providers', () => runtime.listWorkspaceProviders());
   ipcMain.handle('workspace:status', () => runtime.getWorkspaceStatus());
   ipcMain.handle('workspace:search', (_event, query: string, options) => runtime.searchWorkspace(query, options));

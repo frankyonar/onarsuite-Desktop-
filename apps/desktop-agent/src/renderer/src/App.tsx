@@ -911,7 +911,7 @@ function WorkspaceView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'e
   const [providers, setProviders] = useState<ProviderDescriptor[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<WorkspaceSearchResult[]>([]);
-  const [selected, setSelected] = useState<{ id: string; provider: string }>();
+  const [selected, setSelected] = useState<WorkspaceSearchResult>();
   const [card, setCard] = useState('');
   const [busy, setBusy] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -936,9 +936,18 @@ function WorkspaceView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'e
 
   const openCard = async (result: WorkspaceSearchResult) => {
     const { id, provider } = result.resource;
-    setSelected({ id, provider });
+    setSelected(result);
     try { setCard(await window.maxDesktop.getWorkspaceCard(id, provider)); }
     catch (error) { setCard(''); onNotice({ tone: 'error', text: errorText(error) }); }
+  };
+
+  const togglePrivacy = async (patch: { excludedFromAi?: boolean; localOnly?: boolean }) => {
+    if (!selected || selected.resource.source !== 'local') return;
+    const next = { ...selected, resource: { ...selected.resource, privacy: { ...selected.resource.privacy, ...patch } } };
+    setSelected(next);
+    setResults((rs) => rs.map((r) => (r.resource.id === next.resource.id ? next : r)));
+    try { await window.maxDesktop.setMemoryPrivacy(selected.resource.id, patch); onNotice({ tone: 'success', text: 'Privacy aggiornata.' }); }
+    catch (error) { onNotice({ tone: 'error', text: errorText(error) }); }
   };
 
   return <div className="explorer">
@@ -955,7 +964,7 @@ function WorkspaceView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'e
         <Button disabled={busy || !query.trim()}>{busy ? '…' : 'Cerca'}</Button>
       </form>
       <div className="entry-list">
-        {results.map((result) => <button key={`${result.resource.provider}:${result.resource.id}`} className={`entry ${selected?.id === result.resource.id ? 'selected' : ''}`} onClick={() => void openCard(result)}>
+        {results.map((result) => <button key={`${result.resource.provider}:${result.resource.id}`} className={`entry ${selected?.resource.id === result.resource.id ? 'selected' : ''}`} onClick={() => void openCard(result)}>
           <span className="entry-icon">{result.resource.source === 'local' ? '▤' : result.resource.source === 'cloud' ? '☁' : '🔌'}</span>
           <span className="entry-name">{result.resource.privacy.sensitiveDetected && <span title="Contiene dati sensibili" className="ws-sensitive">🔒</span>}{result.resource.name}<small className="muted-line">{result.snippet ?? result.resource.virtualPath}</small></span>
           <time>{result.scores.final.toFixed(2)}</time>
@@ -964,7 +973,12 @@ function WorkspaceView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'e
         {!searched && <p className="muted-line">Cerca per nome, contenuto, argomento o entità (email, importi, date…).</p>}
       </div>
     </Card>
-    <Card className="editor" eyebrow="SCHEDA OSMEM" title={selected ? selected.id : 'Nessuna risorsa selezionata'}>
+    <Card className="editor" eyebrow="SCHEDA OSMEM" title={selected ? selected.resource.name : 'Nessuna risorsa selezionata'}>
+      {selected && selected.resource.source === 'local' && <div className="ws-privacy">
+        <label><input type="checkbox" checked={selected.resource.privacy.excludedFromAi} onChange={(event) => void togglePrivacy({ excludedFromAi: event.target.checked })} /> Escludi dall'AI</label>
+        <label><input type="checkbox" checked={selected.resource.privacy.localOnly} onChange={(event) => void togglePrivacy({ localOnly: event.target.checked })} /> Solo locale (mai cloud)</label>
+        {selected.resource.privacy.sensitiveDetected && <span className="ws-sensitive-tag">🔒 dati sensibili</span>}
+      </div>}
       {card ? <pre className="code-editor ws-card" style={{ whiteSpace: 'pre-wrap' }}>{card}</pre> : <EmptyState icon="←" title="Seleziona un risultato">La scheda di memoria (OSMEM) della risorsa apparirà qui.</EmptyState>}
     </Card>
   </div>;

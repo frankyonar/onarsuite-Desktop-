@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.44', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.45', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', planName: 'PRO', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -156,6 +156,7 @@ export function createPreviewApi(): MaxDesktopApi {
     ],
     restoreMemorySnapshot: async (id) => ({ id, createdAt: new Date().toISOString(), records: 2 }),
     deleteMemorySnapshot: async () => undefined,
+    setMemoryPrivacy: async () => undefined,
     getMemoryGraph: async () => ({
       nodes: [
         { id: 'entity:email:mario@rossi.it', kind: 'entity', label: 'mario@rossi.it', entityType: 'email', weight: 3 },

@@ -58,6 +58,7 @@ const api: MaxDesktopApi = {
   listMemorySnapshots: () => ipcRenderer.invoke('memory:snapshots'),
   restoreMemorySnapshot: (id) => ipcRenderer.invoke('memory:restore', id),
   deleteMemorySnapshot: (id) => ipcRenderer.invoke('memory:snapshot-delete', id),
+  setMemoryPrivacy: (fileId, patch) => ipcRenderer.invoke('memory:set-privacy', fileId, patch),
   listWorkspaceProviders: () => ipcRenderer.invoke('workspace:providers'),
   getWorkspaceStatus: () => ipcRenderer.invoke('workspace:status'),
   searchWorkspace: (query, options) => ipcRenderer.invoke('workspace:search', query, options),

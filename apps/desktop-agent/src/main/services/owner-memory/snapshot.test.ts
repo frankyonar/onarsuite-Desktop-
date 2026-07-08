@@ -40,6 +40,18 @@ describe('OnarOwnerMemoryEngine snapshots', () => {
     expect((await engine.getStatus()).totalFiles).toBe(2);
   });
 
+  it('updates and persists a record privacy flag', async () => {
+    const before = await engine.search('primo');
+    const id = before[0].record.id;
+    await engine.setPrivacy(id, { excludedFromAi: true, localOnly: true });
+    const record = await engine.record(id);
+    expect(record?.privacy.excludedFromAi).toBe(true);
+    expect(record?.privacy.localOnly).toBe(true);
+    // survives a fresh engine reading the same index
+    const reopened = new OnarOwnerMemoryEngine(dir);
+    expect((await reopened.record(id))?.privacy.excludedFromAi).toBe(true);
+  });
+
   it('deletes a snapshot and rejects restoring a missing one', async () => {
     const meta = await engine.snapshot();
     await engine.deleteSnapshot(meta.id);

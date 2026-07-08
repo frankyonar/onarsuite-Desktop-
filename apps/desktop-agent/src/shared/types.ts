@@ -8,7 +8,7 @@ import type {
   WorkspaceStatus,
 } from './workspace';
 
-export const APP_VERSION = '0.9.44';
+export const APP_VERSION = '0.9.45';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -451,6 +451,7 @@ export interface MaxDesktopApi {
   listMemorySnapshots(): Promise<MemorySnapshotMeta[]>;
   restoreMemorySnapshot(id: string): Promise<MemorySnapshotMeta>;
   deleteMemorySnapshot(id: string): Promise<void>;
+  setMemoryPrivacy(fileId: string, patch: Partial<MemoryPrivacy>): Promise<void>;
   // --- Virtual Workspace (unified layer over local memory, cloud, connectors) ---
   listWorkspaceProviders(): Promise<ProviderDescriptor[]>;
   getWorkspaceStatus(): Promise<WorkspaceStatus>;
