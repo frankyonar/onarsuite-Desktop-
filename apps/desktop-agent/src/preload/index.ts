@@ -53,6 +53,7 @@ const api: MaxDesktopApi = {
   searchMemory: (query, options) => ipcRenderer.invoke('memory:search', query, options),
   getMemoryCard: (fileId) => ipcRenderer.invoke('memory:card', fileId),
   getMemoryContext: (query, level) => ipcRenderer.invoke('memory:context', query, level),
+  getMemoryGraph: (options) => ipcRenderer.invoke('memory:graph', options),
   listWorkspaceProviders: () => ipcRenderer.invoke('workspace:providers'),
   getWorkspaceStatus: () => ipcRenderer.invoke('workspace:status'),
   searchWorkspace: (query, options) => ipcRenderer.invoke('workspace:search', query, options),

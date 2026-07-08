@@ -92,6 +92,7 @@ function registerIpc(): void {
   ipcMain.handle('memory:search', (_event, query: string, options) => runtime.searchMemory(query, options));
   ipcMain.handle('memory:card', (_event, fileId: string) => runtime.getMemoryCard(fileId));
   ipcMain.handle('memory:context', (_event, query: string, level) => runtime.getMemoryContext(query, level));
+  ipcMain.handle('memory:graph', (_event, options) => runtime.getMemoryGraph(options));
   ipcMain.handle('workspace:providers', () => runtime.listWorkspaceProviders());
   ipcMain.handle('workspace:status', () => runtime.getWorkspaceStatus());
   ipcMain.handle('workspace:search', (_event, query: string, options) => runtime.searchWorkspace(query, options));

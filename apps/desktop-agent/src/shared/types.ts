@@ -8,7 +8,7 @@ import type {
   WorkspaceStatus,
 } from './workspace';
 
-export const APP_VERSION = '0.9.39';
+export const APP_VERSION = '0.9.40';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -345,6 +345,39 @@ export interface MemorySearchResult {
   matchedFields: string[];
 }
 
+/** A node in the local knowledge graph: either an indexed file or an entity. */
+export interface MemoryGraphNode {
+  id: string;
+  kind: 'file' | 'entity';
+  label: string;
+  /** For entity nodes: the entity type (email, money, date, …). */
+  entityType?: string;
+  /** Files: 0. Entities: how many files mention it (degree). */
+  weight: number;
+}
+
+export interface MemoryGraphEdge {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+export interface MemoryGraph {
+  nodes: MemoryGraphNode[];
+  edges: MemoryGraphEdge[];
+  /** Entities that connect two or more files (the interesting cross-links). */
+  sharedEntities: number;
+}
+
+export interface MemoryGraphOptions {
+  /** Only include entities mentioned in >= this many files (default 1). */
+  minFiles?: number;
+  /** Cap on entity nodes, highest-degree first (default 40). */
+  limit?: number;
+  /** Restrict to a single entity type. */
+  entityType?: string;
+}
+
 export type MemoryBudgetLevel = 'simple' | 'medium' | 'advanced';
 
 export interface MemoryContextResult {
@@ -403,6 +436,7 @@ export interface MaxDesktopApi {
   searchMemory(query: string, options?: MemorySearchOptions): Promise<MemorySearchResult[]>;
   getMemoryCard(fileId: string): Promise<string>;
   getMemoryContext(query: string, level?: MemoryBudgetLevel): Promise<MemoryContextResult>;
+  getMemoryGraph(options?: MemoryGraphOptions): Promise<MemoryGraph>;
   // --- Virtual Workspace (unified layer over local memory, cloud, connectors) ---
   listWorkspaceProviders(): Promise<ProviderDescriptor[]>;
   getWorkspaceStatus(): Promise<WorkspaceStatus>;

@@ -2,7 +2,7 @@ import { dialog, safeStorage, shell } from 'electron';
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type ConsoleItem, type Conversation, type ConversationMeta, type FileAction, type FileContent, type FsEntry, type LocalFile, type MemoryBudgetLevel, type MemoryContextResult, type MemoryEngineStatus, type MemoryScanResult, type MemorySearchOptions, type MemorySearchResult, type PairingInput } from '../shared/types';
+import { APP_VERSION, type ActionResult, type AgentRunInput, type AgentStreamEvent, type AppSnapshot, type ChatRequest, type ChatResult, type ConsoleItem, type Conversation, type ConversationMeta, type FileAction, type FileContent, type FsEntry, type LocalFile, type MemoryBudgetLevel, type MemoryContextResult, type MemoryEngineStatus, type MemoryGraph, type MemoryGraphOptions, type MemoryScanResult, type MemorySearchOptions, type MemorySearchResult, type PairingInput } from '../shared/types';
 import { isAllowedPath } from '../shared/path-policy';
 import { AgentSdk, NetworkError, RevokedDeviceError } from './services/agent-sdk';
 import { AgentEngine } from './services/agent-engine';
@@ -590,6 +590,10 @@ export class DesktopRuntime {
 
   getMemoryContext(query: string, level?: MemoryBudgetLevel): Promise<MemoryContextResult> {
     return this.memory.context(query, level);
+  }
+
+  getMemoryGraph(options?: MemoryGraphOptions): Promise<MemoryGraph> {
+    return this.memory.graph(options);
   }
 
   // --- Virtual Workspace (unified layer over local memory, cloud, connectors) ---

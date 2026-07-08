@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, Conversation, FsEntry, 
 let convs: Conversation[] = [];
 
 const snapshot: AppSnapshot = {
-  appVersion: '0.9.39', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
+  appVersion: '0.9.40', connection: 'connected', serverUrl: 'https://onarsuite.com', deviceId: 'dev_preview',
   deviceName: 'PC Francesco - Max Desktop', accountLabel: 'OnarSuite Demo', planName: 'PRO', workspacePath: 'C:\\Users\\franc\\Documents\\OnarSuite Workspace',
   authorizedFolders: ['C:\\Users\\franc\\Documents\\Clienti'],
   permissions: ['files:read', 'files:write', 'files:edit_existing', 'files:create', 'files:delete', 'files:upload', 'system:shell', 'crm:create_draft', 'quotes:create_draft', 'tasks:create'],
@@ -149,6 +149,25 @@ export function createPreviewApi(): MaxDesktopApi {
     searchMemory: async () => [],
     getMemoryCard: async (fileId) => `OSMEM/1.0\n@node file:${fileId}\npermissions:\nlocal_only = true\nsend_to_cloud = ask`,
     getMemoryContext: async (query, level = 'medium') => ({ query, budgetTokens: level === 'simple' ? 1000 : level === 'advanced' ? 12000 : 4000, estimatedTokens: 0, truncated: false, fileIds: [], context: '' }),
+    getMemoryGraph: async () => ({
+      nodes: [
+        { id: 'entity:email:mario@rossi.it', kind: 'entity', label: 'mario@rossi.it', entityType: 'email', weight: 3 },
+        { id: 'entity:money:€1.200', kind: 'entity', label: '€1.200', entityType: 'money', weight: 2 },
+        { id: 'entity:date:15/03/2026', kind: 'entity', label: '15/03/2026', entityType: 'date', weight: 1 },
+        { id: 'file:a', kind: 'file', label: 'Preventivo Rossi.pdf', weight: 0 },
+        { id: 'file:b', kind: 'file', label: 'Contratto Rossi.docx', weight: 0 },
+        { id: 'file:c', kind: 'file', label: 'Email cliente.txt', weight: 0 },
+      ],
+      edges: [
+        { source: 'entity:email:mario@rossi.it', target: 'file:a', weight: 1 },
+        { source: 'entity:email:mario@rossi.it', target: 'file:b', weight: 1 },
+        { source: 'entity:email:mario@rossi.it', target: 'file:c', weight: 1 },
+        { source: 'entity:money:€1.200', target: 'file:a', weight: 1 },
+        { source: 'entity:money:€1.200', target: 'file:b', weight: 1 },
+        { source: 'entity:date:15/03/2026', target: 'file:a', weight: 1 },
+      ],
+      sharedEntities: 2,
+    }),
     listWorkspaceProviders: async () => [
       { key: 'local-memory', label: 'Memoria locale (Desktop)', source: 'local', capabilities: ['search', 'read', 'card', 'scan'], status: { state: 'ready', resourceCount: 2 } },
       { key: 'onarsuite-cloud', label: 'OnarSuite Cloud', source: 'cloud', capabilities: ['search', 'read', 'sync'], status: { state: 'ready' } },

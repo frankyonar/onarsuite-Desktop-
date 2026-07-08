@@ -7,6 +7,10 @@ import type {
   MemoryContextResult,
   MemoryEngineStatus,
   MemoryFileRecord,
+  MemoryGraph,
+  MemoryGraphNode,
+  MemoryGraphEdge,
+  MemoryGraphOptions,
   MemoryScanResult,
   MemorySearchOptions,
   MemorySearchResult,
@@ -85,6 +89,56 @@ export class OwnerMemoryEngine {
   /** Total number of indexed records (used for provider status). */
   async count(): Promise<number> {
     return (await this.readIndex()).records.length;
+  }
+
+  /**
+   * Build a knowledge graph from the index: file nodes linked to the entities
+   * they mention. Entities shared by several files become the hubs that reveal
+   * how documents relate (same client email, same amount, same date).
+   */
+  async graph(options: MemoryGraphOptions = {}): Promise<MemoryGraph> {
+    const minFiles = Math.max(1, options.minFiles ?? 1);
+    const limit = Math.min(Math.max(options.limit ?? 40, 1), 200);
+    const records = (await this.readIndex()).records.filter((record) => !record.privacy.excludedFromAi);
+
+    // Gather entity -> set of file ids.
+    const entityFiles = new Map<string, { type: string; value: string; files: Set<string> }>();
+    for (const record of records) {
+      for (const entity of record.entities) {
+        if (options.entityType && entity.type !== options.entityType) continue;
+        const key = `entity:${entity.type}:${entity.value.toLowerCase()}`;
+        const bucket = entityFiles.get(key) ?? { type: entity.type, value: entity.value, files: new Set<string>() };
+        bucket.files.add(record.id);
+        entityFiles.set(key, bucket);
+      }
+    }
+
+    const keptEntities = [...entityFiles.entries()]
+      .filter(([, info]) => info.files.size >= minFiles)
+      .sort((a, b) => b[1].files.size - a[1].files.size)
+      .slice(0, limit);
+
+    const nodes: MemoryGraphNode[] = [];
+    const edges: MemoryGraphEdge[] = [];
+    const usedFiles = new Set<string>();
+    let sharedEntities = 0;
+
+    for (const [id, info] of keptEntities) {
+      nodes.push({ id, kind: 'entity', label: info.value, entityType: info.type, weight: info.files.size });
+      if (info.files.size >= 2) sharedEntities++;
+      for (const fileId of info.files) {
+        edges.push({ source: id, target: `file:${fileId}`, weight: 1 });
+        usedFiles.add(fileId);
+      }
+    }
+
+    const byId = new Map(records.map((record) => [record.id, record]));
+    for (const fileId of usedFiles) {
+      const record = byId.get(fileId);
+      if (record) nodes.push({ id: `file:${fileId}`, kind: 'file', label: record.name, weight: 0 });
+    }
+
+    return { nodes, edges, sharedEntities };
   }
 
   async context(query: string, level: MemoryBudgetLevel = 'medium'): Promise<MemoryContextResult> {

@@ -1,12 +1,13 @@
 ﻿import { createElement, useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AgentStreamEvent, AppSnapshot, AuditEntry, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
+import type { MemoryGraph, MemoryGraphNode } from '../../shared/types';
 import type { ProviderDescriptor, WorkspaceSearchResult } from '../../shared/workspace';
 import { AppLogo, BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard } from './components';
 import { ActionFormRenderer } from './MagicPanel';
 import { getUpdatePresentation } from './update-ui';
 
-type View = 'onarsuite' | 'clients' | 'agent' | 'explorer' | 'workspace' | 'dashboard' | 'folders' | 'logs' | 'settings';
+type View = 'onarsuite' | 'clients' | 'agent' | 'explorer' | 'workspace' | 'graph' | 'dashboard' | 'folders' | 'logs' | 'settings';
 type Theme = 'light' | 'dark';
 
 function useTheme(): [Theme, () => void] {
@@ -25,6 +26,7 @@ function useTheme(): [Theme, () => void] {
 const navItems: Array<{ id: View; label: string; icon: string }> = [
   { id: 'agent', label: 'Chat Max', icon: '◆' },
   { id: 'workspace', label: 'Workspace', icon: '❖' },
+  { id: 'graph', label: 'Grafo entità', icon: '⧉' },
   { id: 'explorer', label: 'File locali', icon: '▤' },
   { id: 'folders', label: 'Cartelle autorizzate', icon: '▱' },
   { id: 'logs', label: 'Attività', icon: '≡' },
@@ -280,6 +282,7 @@ export function App() {
       {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} onPersist={(items) => void persistConversation(activeConv.id, items)} onPanel={showPanel} onAssistantAction={(openUrl) => { const nextPath = openUrl ? new URL(openUrl).pathname + new URL(openUrl).search : undefined; openWebDock(nextPath); setNotice({ tone: 'success', text: 'Max ha preparato questa operazione nel pannello laterale.' }); }} onTitle={(id) => void titleConversation(id)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
       {view === 'workspace' && <WorkspaceView onNotice={setNotice} />}
+      {view === 'graph' && <GraphView onNotice={setNotice} />}
       {view === 'dashboard' && <Dashboard snapshot={snapshot} files={files} logs={logs} onGoAgent={() => setView('agent')} onSync={() => run(() => window.maxDesktop.syncNow())} />}
       {view === 'folders' && <FoldersView snapshot={snapshot} busy={busy} onAdd={() => run(() => window.maxDesktop.addAuthorizedFolder())} onRemove={(folder) => run(() => window.maxDesktop.removeAuthorizedFolder(folder))} onDrop={importDrop} onChoose={() => run(() => window.maxDesktop.chooseFiles(), 'File aggiunti alla workspace.')} />}
       {view === 'logs' && <LogsView logs={logs} />}
@@ -947,6 +950,109 @@ function WorkspaceView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'e
   </div>;
 }
 
+const ENTITY_COLORS: Record<string, string> = {
+  email: '#3b82f6', money: '#16a34a', date: '#a855f7', phone: '#f59e0b', vat: '#ef4444', iban: '#0891b2', url: '#6366f1', ref: '#db2777',
+};
+const GRAPH_W = 720;
+const GRAPH_H = 520;
+
+type GraphPos = Map<string, { x: number; y: number }>;
+
+// Deterministic force-directed layout (Fruchterman-Reingold-ish). Seeded from a
+// circle by index, no randomness, so the graph is stable across renders.
+function layoutGraph(graph: MemoryGraph): GraphPos {
+  const nodes = graph.nodes;
+  const n = nodes.length;
+  const pos = nodes.map((_, i) => {
+    const a = (i / Math.max(1, n)) * Math.PI * 2;
+    return { x: GRAPH_W / 2 + Math.cos(a) * GRAPH_W * 0.32, y: GRAPH_H / 2 + Math.sin(a) * GRAPH_H * 0.32, vx: 0, vy: 0 };
+  });
+  const idx = new Map(nodes.map((node, i) => [node.id, i]));
+  const k = Math.sqrt((GRAPH_W * GRAPH_H) / Math.max(1, n)) * 0.55;
+  const iterations = 220;
+  for (let it = 0; it < iterations; it++) {
+    const cool = 1 - it / iterations;
+    for (let i = 0; i < n; i++) { pos[i].vx = 0; pos[i].vy = 0; }
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      let dx = pos[i].x - pos[j].x, dy = pos[i].y - pos[j].y;
+      const d = Math.hypot(dx, dy) || 0.01; const rep = (k * k) / d;
+      dx = dx / d * rep; dy = dy / d * rep;
+      pos[i].vx += dx; pos[i].vy += dy; pos[j].vx -= dx; pos[j].vy -= dy;
+    }
+    for (const e of graph.edges) {
+      const a = idx.get(e.source), b = idx.get(e.target);
+      if (a === undefined || b === undefined) continue;
+      let dx = pos[a].x - pos[b].x, dy = pos[a].y - pos[b].y;
+      const d = Math.hypot(dx, dy) || 0.01; const att = (d * d) / k;
+      dx = dx / d * att; dy = dy / d * att;
+      pos[a].vx -= dx; pos[a].vy -= dy; pos[b].vx += dx; pos[b].vy += dy;
+    }
+    const maxStep = k * 2 * cool;
+    for (let i = 0; i < n; i++) {
+      const p = pos[i]; const disp = Math.hypot(p.vx, p.vy) || 0.01;
+      p.x += (p.vx / disp) * Math.min(disp, maxStep);
+      p.y += (p.vy / disp) * Math.min(disp, maxStep);
+      p.x += (GRAPH_W / 2 - p.x) * 0.012; p.y += (GRAPH_H / 2 - p.y) * 0.012;
+      p.x = Math.max(24, Math.min(GRAPH_W - 24, p.x)); p.y = Math.max(24, Math.min(GRAPH_H - 24, p.y));
+    }
+  }
+  return new Map(nodes.map((node, i) => [node.id, { x: pos[i].x, y: pos[i].y }]));
+}
+
+function GraphView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'error' | 'warning'; text: string }) => void }) {
+  const [graph, setGraph] = useState<MemoryGraph>();
+  const [sharedOnly, setSharedOnly] = useState(true);
+  const [selected, setSelected] = useState<MemoryGraphNode>();
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async (minFiles: number) => {
+    setBusy(true); setSelected(undefined);
+    try { setGraph(await window.maxDesktop.getMemoryGraph({ minFiles, limit: 60 })); }
+    catch (error) { onNotice({ tone: 'error', text: errorText(error) }); }
+    finally { setBusy(false); }
+  }, [onNotice]);
+
+  useEffect(() => { void load(sharedOnly ? 2 : 1); }, [load, sharedOnly]);
+
+  const positions = graph ? layoutGraph(graph) : undefined;
+  const neighbours = (id: string) => graph ? graph.edges.filter((e) => e.source === id || e.target === id).map((e) => (e.source === id ? e.target : e.source)) : [];
+  const highlighted = selected ? new Set([selected.id, ...neighbours(selected.id)]) : undefined;
+
+  return <div className="explorer graph-layout">
+    <Card className="graph-canvas" title="Grafo entità" eyebrow={graph ? `${graph.sharedEntities} ENTITÀ CONDIVISE` : 'KNOWLEDGE GRAPH'} action={<label className="graph-toggle"><input type="checkbox" checked={sharedOnly} onChange={(event) => setSharedOnly(event.target.checked)} /> Solo collegamenti tra file</label>}>
+      {graph && positions && graph.nodes.length > 0 ? <svg viewBox={`0 0 ${GRAPH_W} ${GRAPH_H}`} className="graph-svg" role="img" aria-label="Grafo delle entità">
+        {graph.edges.map((edge, i) => {
+          const a = positions.get(edge.source), b = positions.get(edge.target);
+          if (!a || !b) return null;
+          const dim = highlighted && !(highlighted.has(edge.source) && highlighted.has(edge.target));
+          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="currentColor" strokeOpacity={dim ? 0.06 : 0.22} strokeWidth={1} />;
+        })}
+        {graph.nodes.map((node) => {
+          const p = positions.get(node.id); if (!p) return null;
+          const isEntity = node.kind === 'entity';
+          const r = isEntity ? 5 + Math.min(node.weight, 6) * 2 : 4;
+          const color = isEntity ? (ENTITY_COLORS[node.entityType ?? ''] ?? '#64748b') : 'var(--muted)';
+          const dim = highlighted && !highlighted.has(node.id);
+          return <g key={node.id} className="graph-node" transform={`translate(${p.x} ${p.y})`} opacity={dim ? 0.25 : 1} onClick={() => setSelected(node)} style={{ cursor: 'pointer' }}>
+            {isEntity ? <circle r={r} fill={color} /> : <rect x={-r} y={-r} width={r * 2} height={r * 2} rx={2} fill={color} />}
+            {(isEntity || selected?.id === node.id) && <text x={r + 3} y={4} fontSize={isEntity ? 11 : 10} fill="currentColor">{node.label.length > 26 ? node.label.slice(0, 25) + '…' : node.label}</text>}
+          </g>;
+        })}
+      </svg> : <EmptyState icon="⧉" title={busy ? 'Costruisco il grafo…' : 'Nessun collegamento'}>{busy ? 'Analizzo le entità dei documenti indicizzati.' : 'Scansiona cartelle con documenti (email, importi, date ricorrenti) per far emergere i collegamenti. Togli il filtro per vedere anche le entità singole.'}</EmptyState>}
+    </Card>
+    <Card className="editor" eyebrow="DETTAGLIO" title={selected ? selected.label : 'Legenda'}>
+      {selected ? <div className="graph-detail">
+        <p><strong>{selected.kind === 'entity' ? `Entità · ${selected.entityType}` : 'File'}</strong></p>
+        {selected.kind === 'entity' && <p className="muted-line">Presente in {selected.weight} file:</p>}
+        <div className="entry-list">{neighbours(selected.id).map((nid) => {
+          const nn = graph?.nodes.find((x) => x.id === nid);
+          return nn ? <div key={nid} className="entry"><span className="entry-icon">{nn.kind === 'file' ? '▤' : '●'}</span><span className="entry-name">{nn.label}</span></div> : null;
+        })}</div>
+      </div> : <div className="graph-legend">{Object.entries(ENTITY_COLORS).map(([type, color]) => <span key={type}><i style={{ background: color }} />{type}</span>)}<span><i style={{ background: 'var(--muted)', borderRadius: 2 }} />file</span></div>}
+    </Card>
+  </div>;
+}
+
 function Dashboard({ snapshot, files, logs, onGoAgent, onSync }: { snapshot: AppSnapshot; files: LocalFile[]; logs: AuditEntry[]; onGoAgent: () => void; onSync: () => void }) { return <div className="page-grid"><Card className="hero-card"><div className="hero-copy"><span className="eyebrow">DIPENDENTE DIGITALE</span><h2>{snapshot.connection === 'connected' ? 'Max è pronto a lavorare.' : 'Max è offline.'}</h2><p>Dai a Max un obiettivo: legge i file, esegue comandi e crea cose in OnarSuite, in autonomia e con audit completo.</p><div className="hero-actions"><Button onClick={onGoAgent}>Apri l'agente</Button><Button variant="secondary" onClick={onSync}>Controlla connessione</Button></div></div><div className="orb"><BrandMark size={84} /><StatusPill state={snapshot.connection} /></div></Card><div className="stats-grid"><Stat label="Documenti visibili" value={String(files.length)} detail="Workspace e cartelle autorizzate" /><Stat label="Cartelle autorizzate" value={String(snapshot.authorizedFolders.length)} detail="Ambito operativo di Max" /><Stat label="Ultimo sync" value={snapshot.lastSyncAt ? formatDate(snapshot.lastSyncAt) : 'Mai'} detail={`Versione ${snapshot.appVersion}`} /></div><Card title="Attività recenti">{logs.length ? <div className="activity-list">{logs.slice(0, 6).map((log) => <div key={log.id}><span className={`log-dot ${log.level}`} /><div><strong>{log.message}</strong><small>{formatDate(log.createdAt)} · {log.eventType}</small></div></div>)}</div> : <EmptyState icon="◎" title="Nessuna attività">Le azioni di Max appariranno qui.</EmptyState>}</Card></div>; }
 function Stat({ label, value, detail }: { label: string; value: string; detail: string }) { return <Card><span className="stat-label">{label}</span><strong className="stat-value">{value}</strong><small>{detail}</small></Card>; }
 
@@ -1098,7 +1204,7 @@ function ClientsView() {
   );
 }
 
-const viewTitles: Record<View, string> = { onarsuite: 'Skills di Max', clients: 'Clienti', agent: 'Agente Max', explorer: 'Esplora file', workspace: 'Virtual Workspace', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
+const viewTitles: Record<View, string> = { onarsuite: 'Skills di Max', clients: 'Clienti', agent: 'Agente Max', explorer: 'Esplora file', workspace: 'Virtual Workspace', graph: 'Grafo entità', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
 function iconFor(ext?: string) { if (!ext) return '▢'; if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return '▤'; if (['xlsx', 'csv'].includes(ext)) return '▦'; if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) return '▣'; return '◇'; }
 function shortPath(value: string) { const parts = value.split(/[\\/]/); return parts.length > 3 ? `…/${parts.slice(-3).join('/')}` : value; }
 function formatBytes(value: number) { if (value < 1024) return `${value} B`; if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`; return `${(value / 1024 ** 2).toFixed(1)} MB`; }
