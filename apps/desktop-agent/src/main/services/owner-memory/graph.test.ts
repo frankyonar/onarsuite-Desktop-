@@ -51,4 +51,14 @@ describe('OnarOwnerMemoryEngine.graph', () => {
     expect(money.nodes.filter((n) => n.kind === 'entity').every((n) => n.entityType === 'money')).toBe(true);
     expect(money.nodes.some((n) => n.label.includes('1.200'))).toBe(true);
   });
+
+  it('persists a sparse embedding on each indexed record', async () => {
+    const graph = await engine.graph();
+    const fileNode = graph.nodes.find((n) => n.kind === 'file');
+    expect(fileNode).toBeDefined();
+    const record = await engine.record(fileNode!.id.replace(/^file:/, ''));
+    expect(record?.embedding).toBeDefined();
+    expect(record!.embedding!.length).toBeGreaterThan(0);
+    expect(record!.embedding![0]).toHaveLength(2); // [bucket, value]
+  });
 });

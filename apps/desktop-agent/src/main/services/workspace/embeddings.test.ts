@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cosine, HashingEmbedder } from './embeddings';
+import { cosine, fromSparse, HashingEmbedder, toSparse } from './embeddings';
 
 const embedder = new HashingEmbedder();
 
@@ -30,6 +30,14 @@ describe('HashingEmbedder', () => {
 
   it('empty text yields a zero vector (cosine 0)', () => {
     expect(cosine(embedder.embed(''), embedder.embed('qualcosa'))).toBe(0);
+  });
+
+  it('sparse round-trip preserves the vector (self-cosine ~1) and is compact', () => {
+    const dense = embedder.embed('contratto cliente mario@rossi.it €1.200');
+    const sparse = toSparse(dense);
+    expect(sparse.length).toBeLessThan(dense.length); // most buckets are 0
+    const restored = fromSparse(sparse);
+    expect(cosine(dense, restored)).toBeCloseTo(1, 3);
   });
 
   it('tri-gram shingles catch near-misses (typos/inflections)', () => {

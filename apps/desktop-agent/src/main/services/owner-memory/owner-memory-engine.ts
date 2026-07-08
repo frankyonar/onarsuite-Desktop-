@@ -16,6 +16,7 @@ import type {
   MemorySearchResult,
 } from '../../../shared/types';
 import { isSupportedFile, parseDocument } from '../document-parser';
+import { HashingEmbedder, recordEmbeddingText, toSparse } from '../workspace/embeddings';
 import { TextContentChunker } from './content-chunker';
 import { extractEntities } from './entity-extractor';
 import { generateOsmem } from './osmem';
@@ -39,6 +40,7 @@ export class OnarOwnerMemoryEngine {
   private readonly indexPath: string;
   private readonly chunker = new TextContentChunker();
   private readonly tokens = new TokenBudgetManager();
+  private readonly embedder = new HashingEmbedder();
   private cache?: StoredMemoryIndex;
   private activeScan?: Promise<MemoryScanResult>;
   private status: MemoryEngineStatus = { state: 'idle', totalFiles: 0, processedFiles: 0, indexedFiles: 0 };
@@ -261,7 +263,7 @@ export class OnarOwnerMemoryEngine {
       }
     }
 
-    return {
+    const record: MemoryFileRecord = {
       id,
       path: filePath,
       name: path.basename(filePath),
@@ -289,6 +291,11 @@ export class OnarOwnerMemoryEngine {
       },
       chunks,
     };
+
+    // Persist the semantic embedding once, at index time (local vector store),
+    // so retrieval never has to recompute it per query.
+    record.embedding = toSparse(this.embedder.embed(recordEmbeddingText(record)));
+    return record;
   }
 
   private async readIndex(): Promise<StoredMemoryIndex> {

@@ -8,7 +8,7 @@ import type {
   WorkspaceStatus,
 } from './workspace';
 
-export const APP_VERSION = '0.9.40';
+export const APP_VERSION = '0.9.41';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -309,6 +309,8 @@ export interface MemoryFileRecord {
   relations: MemoryRelation[];
   privacy: MemoryPrivacy;
   chunks: MemoryChunk[];
+  /** Persisted semantic embedding as sparse [bucket, value] pairs (local vector store). */
+  embedding?: Array<[number, number]>;
 }
 
 export interface MemoryScanResult {

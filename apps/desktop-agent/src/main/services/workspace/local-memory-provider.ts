@@ -11,7 +11,7 @@ import type {
 import type { OnarOwnerMemoryEngine } from '../owner-memory/owner-memory-engine';
 import type { WorkspaceProvider } from './provider';
 import { computeScores } from './retrieval';
-import { cosine, HashingEmbedder } from './embeddings';
+import { cosine, fromSparse, HashingEmbedder, recordEmbeddingText } from './embeddings';
 
 /**
  * Adapts the local {@link OnarOwnerMemoryEngine} to a {@link WorkspaceProvider}.
@@ -63,7 +63,9 @@ export class LocalMemoryProvider implements WorkspaceProvider {
 
   private toSearchResult(item: MemorySearchResult, keywordMax: number, mode: WorkspaceSearchOptions['mode'], queryVector: Float32Array): WorkspaceSearchResult {
     const resource = toResource(item.record);
-    const semantic = cosine(queryVector, this.embedder.embed(recordText(item.record)));
+    // Reuse the persisted embedding; only embed on the fly for legacy/unindexed records.
+    const docVector = item.record.embedding ? fromSparse(item.record.embedding) : this.embedder.embed(recordEmbeddingText(item.record));
+    const semantic = cosine(queryVector, docVector);
     return {
       resource,
       scores: computeScores({ keywordRaw: item.score, keywordMax, semantic, resource, mode: mode ?? 'desktop' }),
@@ -71,19 +73,6 @@ export class LocalMemoryProvider implements WorkspaceProvider {
       snippet: item.record.summaryShort || undefined,
     };
   }
-}
-
-/** Text surface used for semantic embedding: the descriptive fields, not raw body. */
-function recordText(record: MemoryFileRecord): string {
-  return [
-    record.name,
-    record.summaryShort,
-    record.summaryLong,
-    record.topics.join(' '),
-    record.entities.map((entity) => entity.value).join(' '),
-  ]
-    .filter(Boolean)
-    .join(' ');
 }
 
 export function toResource(record: MemoryFileRecord): WorkspaceResource {

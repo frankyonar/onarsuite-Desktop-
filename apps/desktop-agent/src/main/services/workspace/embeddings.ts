@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { MemoryFileRecord } from '../../../shared/types';
 
 /**
  * Produces a fixed-length vector for a text so two texts can be compared by
@@ -35,6 +36,40 @@ export class HashingEmbedder implements Embedder {
     }
     return normalize(vector);
   }
+}
+
+/** The descriptive text surface a record is embedded from (not its raw body). */
+export function recordEmbeddingText(record: MemoryFileRecord): string {
+  return [
+    record.name,
+    record.summaryShort,
+    record.summaryLong,
+    record.topics.join(' '),
+    record.entities.map((entity) => entity.value).join(' '),
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** A compact [bucket, value] pair list — most buckets are 0, so store only the rest. */
+export type SparseVector = Array<[number, number]>;
+
+/** Dense vector -> sparse (non-zero buckets), rounded, for persisting in the index. */
+export function toSparse(dense: Float32Array): SparseVector {
+  const out: SparseVector = [];
+  for (let i = 0; i < dense.length; i++) {
+    if (dense[i] !== 0) out.push([i, Math.round(dense[i] * 10000) / 10000]);
+  }
+  return out;
+}
+
+/** Sparse -> dense, to rebuild a stored embedding for cosine comparison. */
+export function fromSparse(sparse: SparseVector, dimensions = 256): Float32Array {
+  const dense = new Float32Array(dimensions);
+  for (const [bucket, value] of sparse) {
+    if (bucket >= 0 && bucket < dimensions) dense[bucket] = value;
+  }
+  return dense;
 }
 
 /** Cosine similarity of two L2-normalized vectors, clamped to [0, 1]. */
