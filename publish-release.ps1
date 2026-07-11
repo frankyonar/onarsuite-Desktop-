@@ -40,10 +40,9 @@ $token = $line.ToString().Substring(9)
 $bodyText = @"
 OnarSuite $($appPkg.version)
 
-- Redesign completo dell'app desktop in stile glassmorphism.
-- Nuova palette pastello viola, blu e rosa con pannelli trasparenti e blur smerigliato.
-- Nuovo sistema di icone SVG morbide in stile gel per sidebar, dock, moduli e stati vuoti.
-- Aggiornati chat, Magic Panel, explorer, workspace e moduli OnarSuite con superfici vetro coerenti.
+- Corretto il layout del pannello destro Magic Panel: intestazione, tab e contenuto restano ancorati in alto nel giusto ordine.
+- Lo stato vuoto Output ora resta visibile e centrato invece di lasciare il pannello apparentemente vuoto.
+- Stabilizzato il layout del dock con una griglia dedicata, mantenendo la rail compatta invariata.
 
 Nota: per ridurre davvero i falsi positivi di SmartScreen/antivirus, firma il
 binario Windows con un certificato di code signing prima della distribuzione

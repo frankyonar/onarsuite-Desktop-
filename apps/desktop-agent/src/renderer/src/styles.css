@@ -1009,8 +1009,35 @@ body::after {
 }
 
 .dock {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-content: stretch;
   border-left-color: rgba(255,255,255,.36);
   background: linear-gradient(145deg, rgba(255,255,255,.56), rgba(255,255,255,.22));
+}
+
+.dock-rail {
+  display: flex;
+}
+
+.dock-head {
+  grid-row: 1;
+  align-self: start;
+}
+
+.dock-tabs {
+  grid-row: 2;
+  align-self: start;
+}
+
+.dock-content {
+  grid-row: 3;
+  height: 100%;
+  min-height: 0;
+}
+
+.dock-pane > .empty-state:only-child {
+  margin: auto;
 }
 
 [data-theme='dark'] .dock {
