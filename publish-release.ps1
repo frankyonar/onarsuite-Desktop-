@@ -40,10 +40,10 @@ $token = $line.ToString().Substring(9)
 $bodyText = @"
 OnarSuite $($appPkg.version)
 
-- I percorsi file locali mostrati nelle risposte di Max sono ora cliccabili.
-- Un click su un PDF o altro file locale apre direttamente il file con l'app predefinita di Windows.
-- Il riconoscimento funziona anche sulle vecchie chat salvate, senza rigenerare la risposta.
-- Aggiunto un test dedicato per i risultati con file PDF in Download.
+- Redesign completo dell'app desktop in stile glassmorphism.
+- Nuova palette pastello viola, blu e rosa con pannelli trasparenti e blur smerigliato.
+- Nuovo sistema di icone SVG morbide in stile gel per sidebar, dock, moduli e stati vuoti.
+- Aggiornati chat, Magic Panel, explorer, workspace e moduli OnarSuite con superfici vetro coerenti.
 
 Nota: per ridurre davvero i falsi positivi di SmartScreen/antivirus, firma il
 binario Windows con un certificato di code signing prima della distribuzione

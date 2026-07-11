@@ -3,7 +3,7 @@ import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, ConsoleIte
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import type { MemoryGraph, MemoryGraphNode, MemorySnapshotMeta } from '../../shared/types';
 import type { ProviderDescriptor, WorkspaceSearchResult } from '../../shared/workspace';
-import { AppLogo, BrandMark, Button, Card, EmptyState, Markdown, StatusPill, ToolCard } from './components';
+import { AppLogo, BrandMark, Button, Card, EmptyState, GlassIcon, Markdown, StatusPill, ToolCard, type GlassIconName } from './components';
 import { ActionFormRenderer } from './MagicPanel';
 import { getUpdatePresentation } from './update-ui';
 
@@ -23,19 +23,19 @@ function useTheme(): [Theme, () => void] {
   return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))];
 }
 
-const navItems: Array<{ id: View; label: string; icon: string }> = [
-  { id: 'agent', label: 'Chat Max', icon: '◆' },
-  { id: 'workspace', label: 'Workspace', icon: '❖' },
-  { id: 'graph', label: 'Grafo entità', icon: '⧉' },
-  { id: 'explorer', label: 'File locali', icon: '▤' },
-  { id: 'folders', label: 'Cartelle autorizzate', icon: '▱' },
-  { id: 'logs', label: 'Attività', icon: '≡' },
+const navItems: Array<{ id: View; label: string; icon: GlassIconName }> = [
+  { id: 'agent', label: 'Chat Max', icon: 'agent' },
+  { id: 'workspace', label: 'Workspace', icon: 'workspace' },
+  { id: 'graph', label: 'Grafo entità', icon: 'graph' },
+  { id: 'explorer', label: 'File locali', icon: 'files' },
+  { id: 'folders', label: 'Cartelle autorizzate', icon: 'folders' },
+  { id: 'logs', label: 'Attività', icon: 'activity' },
 ];
 
 // Secondary "tools" - OnarSuite modules Max can also open, kept below the chat.
-const toolItems: Array<{ id: View; label: string; icon: string }> = [
-  { id: 'onarsuite', label: 'Skills di Max', icon: '◎' },
-  { id: 'clients', label: 'Clienti', icon: '◈' },
+const toolItems: Array<{ id: View; label: string; icon: GlassIconName }> = [
+  { id: 'onarsuite', label: 'Skills di Max', icon: 'skills' },
+  { id: 'clients', label: 'Clienti', icon: 'clients' },
 ];
 
 export function App() {
@@ -236,8 +236,8 @@ export function App() {
   return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)${dockView !== 'closed' ? ` ${dockW}px` : ''}` }}>
     <aside className="sidebar">
       <div className="brand"><AppLogo theme="dark" planName={snapshot.planName} /></div>
-      <button className="new-chat" onClick={() => void newChat()}><span>+</span>Nuova chat</button>
-      <nav>{navItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}</nav>
+      <button className="new-chat" onClick={() => void newChat()}><GlassIcon name="plus" />Nuova chat</button>
+      <nav>{navItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><GlassIcon name={item.icon} />{item.label}</button>)}</nav>
       <div className="conv-section">
         <div className="conv-search"><input value={convSearch} onChange={(e) => setConvSearch(e.target.value)} placeholder="Cerca chat..." /></div>
         <div className="conv-list">
@@ -256,8 +256,8 @@ export function App() {
         </div>
       </div>
       <div className="nav-divider">Strumenti</div>
-      <nav>{toolItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}
-        <button className={view === 'settings' ? 'active' : ''} onClick={() => setView('settings')}><span>⚙</span>Impostazioni</button>
+      <nav>{toolItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><GlassIcon name={item.icon} />{item.label}</button>)}
+        <button className={view === 'settings' ? 'active' : ''} onClick={() => setView('settings')}><GlassIcon name="settings" />Impostazioni</button>
       </nav>
       <div className="sidebar-status">
         <StatusPill state={snapshot.connection} />
@@ -274,13 +274,13 @@ export function App() {
           <button className={`topbar-icon ${dockView !== 'closed' && dockTab === 'output' ? 'active' : ''}`} title="Magic Panel" aria-label="Magic Panel" onClick={() => {
             if (dockView !== 'closed' && dockTab === 'output') setDockView('closed');
             else openDockTab('output');
-          }}>✦</button>
+          }}><GlassIcon name="magic" bare /></button>
           <button className={`topbar-icon ${dockView !== 'closed' && dockTab === 'anteprima' ? 'active' : ''}`} title="OnarSuite web" onClick={() => {
             if (dockView !== 'closed' && dockTab === 'anteprima') { setDockView('closed'); }
             else { setLockWebPath(undefined); openWebDock(undefined); }
-          }}>◎</button>
-          <button className="topbar-icon" title="Tema chiaro/scuro" onClick={toggleTheme}>{theme === 'dark' ? '☀' : '☾'}</button>
-          <button className="topbar-icon" title="Sincronizza" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}>⟳</button>
+          }}><GlassIcon name="web" bare /></button>
+          <button className="topbar-icon" title="Tema chiaro/scuro" onClick={toggleTheme}><GlassIcon name="theme" bare /></button>
+          <button className="topbar-icon" title="Sincronizza" disabled={busy} onClick={() => run(() => window.maxDesktop.syncNow(), 'Sincronizzazione completata.')}><GlassIcon name="sync" bare /></button>
         </div>
       </header>
       <UpdateBanner state={updateState} busy={updateBusy} onAction={handleUpdateAction} />
@@ -482,14 +482,14 @@ function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel,
 type DockTab = 'anteprima' | 'contesto' | 'file' | 'attivita' | 'output';
 type DockView = 'closed' | 'rail' | 'normal' | 'expanded';
 
-const DOCK_TABS: Array<{ id: DockTab; label: string; icon: string }> = [
-  { id: 'anteprima', label: 'Anteprima', icon: '◫' },
-  { id: 'contesto', label: 'Contesto', icon: '◎' },
-  { id: 'file', label: 'File', icon: '▤' },
-  { id: 'attivita', label: 'Attività', icon: '≡' },
-  { id: 'output', label: 'Output', icon: '◆' },
+const DOCK_TABS: Array<{ id: DockTab; label: string; icon: GlassIconName }> = [
+  { id: 'anteprima', label: 'Anteprima', icon: 'preview' },
+  { id: 'contesto', label: 'Contesto', icon: 'context' },
+  { id: 'file', label: 'File', icon: 'files' },
+  { id: 'attivita', label: 'Attività', icon: 'activity' },
+  { id: 'output', label: 'Output', icon: 'output' },
 ];
-const OUT_ICONS: Record<PanelData['kind'], string> = { customer: '◉', contract: '▤', reminder: '⏰', file: '◇', table: '▦', result: '◆', form: '✦', confirmation: '✓', html: '◫', checklist: '☷' };
+const OUT_ICONS: Record<PanelData['kind'], GlassIconName> = { customer: 'customer', contract: 'contract', reminder: 'reminder', file: 'file', table: 'table', result: 'output', form: 'form', confirmation: 'success', html: 'preview', checklist: 'checklist' };
 
 /** The right "Workspace Dock": a Codex-style multi-tab side panel (web preview,
  *  Max context, files, activity, generated outputs). Resizable / rail / expanded. */
@@ -503,8 +503,8 @@ function WorkspaceDock(props: {
   const { view, tab, snapshot, files, logs, serverUrl, webPath, outputs, selectedOutput } = props;
   if (view === 'rail') {
     return <aside className="dock dock-rail">
-      <button className="dock-rail-btn open" title="Apri Workspace" aria-label="Apri Workspace" onClick={() => props.onTab(tab)}>‹</button>
-      {DOCK_TABS.map((t) => <button key={t.id} className={`dock-rail-btn ${tab === t.id ? 'active' : ''}`} title={t.label} aria-label={t.label} onClick={() => props.onTab(t.id)}>{t.icon}</button>)}
+      <button className="dock-rail-btn open" title="Apri Workspace" aria-label="Apri Workspace" onClick={() => props.onTab(tab)}><GlassIcon name="back" bare /></button>
+      {DOCK_TABS.map((t) => <button key={t.id} className={`dock-rail-btn ${tab === t.id ? 'active' : ''}`} title={t.label} aria-label={t.label} onClick={() => props.onTab(t.id)}><GlassIcon name={t.icon} bare /></button>)}
     </aside>;
   }
   const activeOutput = outputs[Math.min(selectedOutput, Math.max(0, outputs.length - 1))];
@@ -515,13 +515,13 @@ function WorkspaceDock(props: {
       <div className="dock-id"><strong>Magic Panel</strong><span>{tabLabel}</span></div>
       <DockStatus connection={snapshot.connection} />
       <div className="dock-tools">
-        <button title="Espandi / riduci" aria-label="Espandi" onClick={props.onToggleExpand}>{view === 'expanded' ? '⤡' : '⤢'}</button>
-        <button title="Riduci a barra" aria-label="Riduci a barra" onClick={props.onRail}>‒</button>
-        <button title="Chiudi pannello" aria-label="Chiudi pannello" onClick={props.onClose}>×</button>
+        <button title="Espandi / riduci" aria-label="Espandi" onClick={props.onToggleExpand}><GlassIcon name={view === 'expanded' ? 'collapse' : 'expand'} bare /></button>
+        <button title="Riduci a barra" aria-label="Riduci a barra" onClick={props.onRail}><GlassIcon name="collapse" bare /></button>
+        <button title="Chiudi pannello" aria-label="Chiudi pannello" onClick={props.onClose}><GlassIcon name="close" bare /></button>
       </div>
     </header>
     <nav className="dock-tabs" role="tablist">
-      {DOCK_TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'active' : ''} onClick={() => props.onTab(t.id)}><span>{t.icon}</span>{t.label}</button>)}
+      {DOCK_TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'active' : ''} onClick={() => props.onTab(t.id)}><GlassIcon name={t.icon} bare />{t.label}</button>)}
     </nav>
     <div className="dock-content">
       {tab === 'anteprima' && <LockWeb serverUrl={serverUrl} nextPath={webPath} onHome={() => undefined} />}
@@ -584,22 +584,22 @@ function DockFiles({ snapshot, files, onAddFolder, onRemoveFolder, onAnalyze }: 
     <section className="dock-block">
       <h4>File recenti</h4>
       {recent.length === 0
-        ? <EmptyState icon="▤" title="Nessun file">Autorizza una cartella o trascina file nella chat.</EmptyState>
+        ? <EmptyState icon="files" title="Nessun file">Autorizza una cartella o trascina file nella chat.</EmptyState>
         : <div className="dock-files">{recent.map((f) => <div key={f.path} className="dock-file"><span className="dock-file-name" title={f.name}>{f.name}</span><div className="dock-file-acts"><button className="dock-mini ghost" onClick={() => void window.maxDesktop.openFile(f.path)}>Apri</button><button className="dock-mini" onClick={() => onAnalyze(f)}>Analizza</button></div></div>)}</div>}
     </section>
   </div>;
 }
 
 function DockActivity({ logs }: { logs: AuditEntry[] }) {
-  if (!logs.length) return <div className="dock-pane"><EmptyState icon="≡" title="Nessuna attività">Le azioni di Max appariranno qui in ordine cronologico.</EmptyState></div>;
+  if (!logs.length) return <div className="dock-pane"><EmptyState icon="activity" title="Nessuna attività">Le azioni di Max appariranno qui in ordine cronologico.</EmptyState></div>;
   return <div className="dock-pane"><div className="dock-timeline">{logs.slice(0, 50).map((l) => <div key={l.id} className="dock-event"><span className={`dock-dot ${l.level}`} /><div className="dock-event-body"><strong>{l.message}</strong><small>{formatDate(l.createdAt)} · {l.eventType}</small></div></div>)}</div></div>;
 }
 
 function DockOutput({ outputs, selected, onSelect, permissions, onNotice, onOpenLink, onActionCompleted }: { outputs: PanelData[]; selected: number; onSelect: (i: number) => void; permissions: string[]; onNotice: (n: Notice) => void; onOpenLink: (url: string) => void; onActionCompleted: (message: string) => void }) {
-  if (!outputs.length) return <div className="dock-pane"><EmptyState icon="◆" title="Nessun output generato">Quando Max crea preventivi, PDF, documenti o codice, appariranno qui.</EmptyState></div>;
+  if (!outputs.length) return <div className="dock-pane"><EmptyState icon="output" title="Nessun output generato">Quando Max crea preventivi, PDF, documenti o codice, appariranno qui.</EmptyState></div>;
   const current = outputs[Math.min(selected, outputs.length - 1)];
   return <div className="dock-output">
-    <div className="dock-output-list">{outputs.map((o, i) => <button key={i} className={i === selected ? 'active' : ''} onClick={() => onSelect(i)}><span className="dock-out-icon">{OUT_ICONS[o.kind] ?? '◆'}</span><span className="dock-out-title" title={o.title}>{o.title}</span></button>)}</div>
+    <div className="dock-output-list">{outputs.map((o, i) => <button key={i} className={i === selected ? 'active' : ''} onClick={() => onSelect(i)}><GlassIcon name={OUT_ICONS[o.kind] ?? 'output'} className="dock-out-icon" bare /><span className="dock-out-title" title={o.title}>{o.title}</span></button>)}</div>
     <div className="dock-output-view"><LockPreview panel={current} permissions={permissions} onNotice={onNotice} onOpenLink={onOpenLink} onActionCompleted={onActionCompleted} /></div>
   </div>;
 }
@@ -671,12 +671,12 @@ function LockWeb({ serverUrl, nextPath, onHome }: { serverUrl: string; nextPath?
   }, [src]);
   return <div className="lock-web">
     <div className="lock-web-bar">
-      <button onClick={() => ref.current?.goBack()} title="Indietro">‹</button>
-      <button onClick={() => ref.current?.goForward()} title="Avanti">›</button>
-      <button onClick={() => ref.current?.reload()} title="Ricarica">⟳</button>
-      <button onClick={() => { onHome(); void window.maxDesktop.webSessionUrl().then((url) => ref.current?.loadURL(url)); }} title="Account OnarSuite">⌂</button>
+      <button onClick={() => ref.current?.goBack()} title="Indietro"><GlassIcon name="back" bare /></button>
+      <button onClick={() => ref.current?.goForward()} title="Avanti"><GlassIcon name="back" className="icon-forward" bare /></button>
+      <button onClick={() => ref.current?.reload()} title="Ricarica"><GlassIcon name="sync" bare /></button>
+      <button onClick={() => { onHome(); void window.maxDesktop.webSessionUrl().then((url) => ref.current?.loadURL(url)); }} title="Account OnarSuite"><GlassIcon name="web" bare /></button>
       <span className="lock-web-status">{loading ? 'Caricamento…' : 'OnarSuite'}</span>
-      <button onClick={() => { const u = ref.current?.getURL(); if (u) void window.maxDesktop.openExternal(u); }} title="Apri nel browser">↗</button>
+      <button onClick={() => { const u = ref.current?.getURL(); if (u) void window.maxDesktop.openExternal(u); }} title="Apri nel browser"><GlassIcon name="expand" bare /></button>
     </div>
     {src && createElement('webview', { ref, className: 'lock-web-frame', src, partition: 'persist:onarsuite-web', allowpopups: 'true' } as Record<string, unknown>)}
   </div>;
@@ -721,7 +721,7 @@ function reduceEvent(prev: ConsoleItem[], event: AgentStreamEvent): ConsoleItem[
 type Notice = { tone: 'success' | 'error' | 'warning'; text: string };
 type Field = { key: string; label: string; type?: 'text' | 'email' | 'date' | 'number' | 'textarea'; required?: boolean; placeholder?: string };
 type ModuleDef = {
-  id: string; label: string; icon: string; hint: string;
+  id: string; label: string; icon: GlassIconName; hint: string;
   listAction?: string; listKey?: string;
   columns: Array<{ key: string; label: string; kind?: 'amount' }>;
   createAction?: string; createLabel?: string; fields?: Field[];
@@ -729,36 +729,36 @@ type ModuleDef = {
 };
 
 const MODULES: ModuleDef[] = [
-  { id: 'reminders', label: 'Promemoria', icon: '◌', hint: 'Scadenze e attività',
+  { id: 'reminders', label: 'Promemoria', icon: 'reminder', hint: 'Scadenze e attività',
     listAction: 'list_reminders', listKey: 'reminders',
     columns: [{ key: 'title', label: 'Titolo' }, { key: 'date', label: 'Scadenza' }, { key: 'priority', label: 'Priorità' }],
     createAction: 'create_reminder', createLabel: 'Nuovo promemoria',
     fields: [{ key: 'title', label: 'Titolo', required: true }, { key: 'date', label: 'Scadenza', type: 'date' }, { key: 'priority', label: 'Priorità', placeholder: 'low · medium · high' }, { key: 'description', label: 'Note', type: 'textarea' }],
     rowActions: [{ label: '✓ Completa', action: 'complete_reminder' }] },
-  { id: 'leads', label: 'Clienti', icon: '◎', hint: 'CRM e contatti',
+  { id: 'leads', label: 'Clienti', icon: 'clients', hint: 'CRM e contatti',
     listAction: 'list_unified_contacts', listKey: 'contacts',
     columns: [{ key: 'display_name', label: 'Nome' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Telefono' }],
     createAction: 'create_unified_contact', createLabel: 'Nuovo cliente',
     fields: [{ key: 'name', label: 'Nome completo', required: true }, { key: 'email', label: 'Email', type: 'email', required: true }, { key: 'phone', label: 'Telefono' }, { key: 'notes', label: 'Note', type: 'textarea' }] },
-  { id: 'contracts', label: 'Contratti', icon: '▤', hint: 'Contratti e bozze',
+  { id: 'contracts', label: 'Contratti', icon: 'contract', hint: 'Contratti e bozze',
     listAction: 'contract_list', listKey: 'contracts',
     columns: [{ key: 'title', label: 'Titolo' }, { key: 'client', label: 'Cliente' }, { key: 'status', label: 'Stato' }, { key: 'amount', label: 'Importo', kind: 'amount' }],
     createAction: 'create_contract', createLabel: 'Nuovo contratto',
     fields: [{ key: 'title', label: 'Titolo', required: true }, { key: 'description', label: 'Descrizione', type: 'textarea' }, { key: 'amount', label: 'Importo (EUR)', type: 'number' }] },
-  { id: 'users', label: 'Utenti', icon: '◍', hint: 'Team e accessi',
+  { id: 'users', label: 'Utenti', icon: 'user', hint: 'Team e accessi',
     listAction: 'list_users', listKey: 'users',
     columns: [{ key: 'name', label: 'Nome' }, { key: 'email', label: 'Email' }, { key: 'type', label: 'Ruolo' }],
     createAction: 'create_user', createLabel: 'Nuovo utente',
     fields: [{ key: 'name', label: 'Nome', required: true }, { key: 'email', label: 'Email', type: 'email', required: true }, { key: 'role_id', label: 'ID ruolo', type: 'number', placeholder: 'es. 126 = Cliente' }, { key: 'mobile_no', label: 'Telefono' }] },
 ];
 
-const COMING: Array<{ label: string; icon: string; hint: string }> = [
-  { label: 'Calendario', icon: '▥', hint: 'Eventi e appuntamenti' },
-  { label: 'Prodotti', icon: '▦', hint: 'Catalogo e magazzino' },
-  { label: 'Preventivi', icon: '▣', hint: 'Offerte commerciali' },
-  { label: 'Fatture', icon: '€', hint: 'Fatturazione' },
-  { label: 'Email', icon: '✉', hint: 'Posta Max AI' },
-  { label: 'Ticket', icon: '◫', hint: 'Assistenza' },
+const COMING: Array<{ label: string; icon: GlassIconName; hint: string }> = [
+  { label: 'Calendario', icon: 'calendar', hint: 'Eventi e appuntamenti' },
+  { label: 'Prodotti', icon: 'products', hint: 'Catalogo e magazzino' },
+  { label: 'Preventivi', icon: 'quotes', hint: 'Offerte commerciali' },
+  { label: 'Fatture', icon: 'invoice', hint: 'Fatturazione' },
+  { label: 'Email', icon: 'email', hint: 'Posta Max AI' },
+  { label: 'Ticket', icon: 'ticket', hint: 'Assistenza' },
 ];
 
 function OnarHome({ onNotice, onGoClients }: { onNotice: (n: Notice) => void; onGoClients: () => void }) {
@@ -768,8 +768,8 @@ function OnarHome({ onNotice, onGoClients }: { onNotice: (n: Notice) => void; on
   return <div className="onar-home">
     <Card className="onar-banner"><div><span className="eyebrow">SKILLS DI MAX</span><h2>Max sceglie il formato più adatto.</h2><p>Chat, form nativi, file e pagine OnarSuite autenticate lavorano insieme nel Magic Panel. Parti dall’obiettivo: Max apre lo strumento giusto.</p><div className="hero-actions"><Button onClick={onGoClients}>Apri Clienti</Button></div></div></Card>
     <div className="module-grid">
-      {MODULES.map((m) => <button key={m.id} className="module-card" onClick={() => setModuleId(m.id)}><span className="module-icon">{m.icon}</span><strong>{m.label}</strong><small>{m.hint}</small></button>)}
-      {COMING.map((m) => <div key={m.label} className="module-card disabled"><span className="module-icon">{m.icon}</span><strong>{m.label}</strong><small>{m.hint}</small><span className="soon">in arrivo</span></div>)}
+      {MODULES.map((m) => <button key={m.id} className="module-card" onClick={() => setModuleId(m.id)}><GlassIcon name={m.icon} className="module-icon" /><strong>{m.label}</strong><small>{m.hint}</small></button>)}
+      {COMING.map((m) => <div key={m.label} className="module-card disabled"><GlassIcon name={m.icon} className="module-icon" /><strong>{m.label}</strong><small>{m.hint}</small><span className="soon">in arrivo</span></div>)}
     </div>
   </div>;
 }
@@ -821,7 +821,7 @@ function ModuleScreen({ def, onBack, onNotice }: { def: ModuleDef; onBack: () =>
   const gridCols = { gridTemplateColumns: [...def.columns.map(() => 'minmax(0, 1fr)'), ...(def.rowActions ? ['150px'] : [])].join(' ') };
 
   return <Card className="module-screen" eyebrow={def.hint} title={def.label}
-    action={<div className="module-actions"><Button variant="ghost" onClick={onBack}>← Moduli</Button>{def.createAction && <Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Annulla' : (def.createLabel ?? 'Nuovo')}</Button>}</div>}>
+    action={<div className="module-actions"><Button variant="ghost" onClick={onBack}><GlassIcon name="back" bare />Moduli</Button>{def.createAction && <Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Annulla' : (def.createLabel ?? 'Nuovo')}</Button>}</div>}>
     {showForm && def.fields && <form className="module-form" onSubmit={submit}>
       {def.fields.map((f) => <label key={f.key}>{f.label}{f.required && ' *'}
         {f.type === 'textarea'
@@ -890,15 +890,15 @@ function ExplorerView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'er
       <div className="entry-list">
         {busy && entries.length === 0 && <p className="muted-line">Carico…</p>}
         {entries.map((entry) => <button key={entry.path} className={`entry ${openPath === entry.path ? 'selected' : ''}`} onClick={() => void openEntry(entry)}>
-          <span className="entry-icon">{entry.kind === 'dir' ? '▸' : iconFor(entry.extension)}</span>
+          <span className="entry-icon"><GlassIcon name={entry.kind === 'dir' ? 'folder' : iconFor(entry.extension)} bare /></span>
           <span className="entry-name">{entry.name}</span>
           {entry.kind === 'file' && entry.size !== undefined && <time>{formatBytes(entry.size)}</time>}
         </button>)}
-        {!busy && entries.length === 0 && <EmptyState icon="▱" title="Cartella vuota">Nessun file qui.</EmptyState>}
+        {!busy && entries.length === 0 && <EmptyState icon="folder" title="Cartella vuota">Nessun file qui.</EmptyState>}
       </div>
     </Card>
     <Card className="editor" eyebrow={truncated ? 'ANTEPRIMA (TRONCATA)' : 'EDITOR'} title={openPath ? shortPath(openPath) : 'Nessun file aperto'} action={openPath ? <Button disabled={!dirty} onClick={() => void save()}>{dirty ? 'Salva' : 'Salvato'}</Button> : undefined}>
-      {openPath ? <textarea className="code-editor" value={content} spellCheck={false} onChange={(event) => { setContent(event.target.value); setDirty(true); }} /> : <EmptyState icon="←" title="Apri un file">Naviga e seleziona un file per leggerlo o modificarlo.</EmptyState>}
+      {openPath ? <textarea className="code-editor" value={content} spellCheck={false} onChange={(event) => { setContent(event.target.value); setDirty(true); }} /> : <EmptyState icon="back" title="Apri un file">Naviga e seleziona un file per leggerlo o modificarlo.</EmptyState>}
     </Card>
   </div>;
 }
@@ -965,11 +965,11 @@ function WorkspaceView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'e
       </form>
       <div className="entry-list">
         {results.map((result) => <button key={`${result.resource.provider}:${result.resource.id}`} className={`entry ${selected?.resource.id === result.resource.id ? 'selected' : ''}`} onClick={() => void openCard(result)}>
-          <span className="entry-icon">{result.resource.source === 'local' ? '▤' : result.resource.source === 'cloud' ? '☁' : '🔌'}</span>
+          <span className="entry-icon"><GlassIcon name={result.resource.source === 'local' ? 'file' : result.resource.source === 'cloud' ? 'web' : 'settings'} bare /></span>
           <span className="entry-name">{result.resource.privacy.sensitiveDetected && <span title="Contiene dati sensibili" className="ws-sensitive">🔒</span>}{result.resource.name}<small className="muted-line">{result.snippet ?? result.resource.virtualPath}</small></span>
           <time>{result.scores.final.toFixed(2)}</time>
         </button>)}
-        {searched && !results.length && <EmptyState icon="❖" title="Nessun risultato">Prova un altro termine o avvia una scansione dalle cartelle autorizzate.</EmptyState>}
+        {searched && !results.length && <EmptyState icon="search" title="Nessun risultato">Prova un altro termine o avvia una scansione dalle cartelle autorizzate.</EmptyState>}
         {!searched && <p className="muted-line">Cerca per nome, contenuto, argomento o entità (email, importi, date…).</p>}
       </div>
     </Card>
@@ -979,7 +979,7 @@ function WorkspaceView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'e
         <label><input type="checkbox" checked={selected.resource.privacy.localOnly} onChange={(event) => void togglePrivacy({ localOnly: event.target.checked })} /> Solo locale (mai cloud)</label>
         {selected.resource.privacy.sensitiveDetected && <span className="ws-sensitive-tag">🔒 dati sensibili</span>}
       </div>}
-      {card ? <pre className="code-editor ws-card" style={{ whiteSpace: 'pre-wrap' }}>{card}</pre> : <EmptyState icon="←" title="Seleziona un risultato">La scheda di memoria (OSMEM) della risorsa apparirà qui.</EmptyState>}
+      {card ? <pre className="code-editor ws-card" style={{ whiteSpace: 'pre-wrap' }}>{card}</pre> : <EmptyState icon="back" title="Seleziona un risultato">La scheda di memoria (OSMEM) della risorsa apparirà qui.</EmptyState>}
     </Card>
   </div>;
 }
@@ -1072,7 +1072,7 @@ function GraphView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'error
             {(isEntity || selected?.id === node.id) && <text x={r + 3} y={4} fontSize={isEntity ? 11 : 10} fill="currentColor">{node.label.length > 26 ? node.label.slice(0, 25) + '…' : node.label}</text>}
           </g>;
         })}
-      </svg> : <EmptyState icon="⧉" title={busy ? 'Costruisco il grafo…' : 'Nessun collegamento'}>{busy ? 'Analizzo le entità dei documenti indicizzati.' : 'Scansiona cartelle con documenti (email, importi, date ricorrenti) per far emergere i collegamenti. Togli il filtro per vedere anche le entità singole.'}</EmptyState>}
+      </svg> : <EmptyState icon="graph" title={busy ? 'Costruisco il grafo…' : 'Nessun collegamento'}>{busy ? 'Analizzo le entità dei documenti indicizzati.' : 'Scansiona cartelle con documenti (email, importi, date ricorrenti) per far emergere i collegamenti. Togli il filtro per vedere anche le entità singole.'}</EmptyState>}
     </Card>
     <Card className="editor" eyebrow="DETTAGLIO" title={selected ? selected.label : 'Legenda'}>
       {selected ? <div className="graph-detail">
@@ -1080,19 +1080,19 @@ function GraphView({ onNotice }: { onNotice: (notice: { tone: 'success' | 'error
         {selected.kind === 'entity' && <p className="muted-line">Presente in {selected.weight} file:</p>}
         <div className="entry-list">{neighbours(selected.id).map((nid) => {
           const nn = graph?.nodes.find((x) => x.id === nid);
-          return nn ? <div key={nid} className="entry"><span className="entry-icon">{nn.kind === 'file' ? '▤' : '●'}</span><span className="entry-name">{nn.label}</span></div> : null;
+          return nn ? <div key={nid} className="entry"><span className="entry-icon"><GlassIcon name={nn.kind === 'file' ? 'file' : 'graph'} bare /></span><span className="entry-name">{nn.label}</span></div> : null;
         })}</div>
       </div> : <div className="graph-legend">{Object.entries(ENTITY_COLORS).map(([type, color]) => <span key={type}><i style={{ background: color }} />{type}</span>)}<span><i style={{ background: 'var(--muted)', borderRadius: 2 }} />file</span></div>}
     </Card>
   </div>;
 }
 
-function Dashboard({ snapshot, files, logs, onGoAgent, onSync }: { snapshot: AppSnapshot; files: LocalFile[]; logs: AuditEntry[]; onGoAgent: () => void; onSync: () => void }) { return <div className="page-grid"><Card className="hero-card"><div className="hero-copy"><span className="eyebrow">DIPENDENTE DIGITALE</span><h2>{snapshot.connection === 'connected' ? 'Max è pronto a lavorare.' : 'Max è offline.'}</h2><p>Dai a Max un obiettivo: legge i file, esegue comandi e crea cose in OnarSuite, in autonomia e con audit completo.</p><div className="hero-actions"><Button onClick={onGoAgent}>Apri l'agente</Button><Button variant="secondary" onClick={onSync}>Controlla connessione</Button></div></div><div className="orb"><BrandMark size={84} /><StatusPill state={snapshot.connection} /></div></Card><div className="stats-grid"><Stat label="Documenti visibili" value={String(files.length)} detail="Workspace e cartelle autorizzate" /><Stat label="Cartelle autorizzate" value={String(snapshot.authorizedFolders.length)} detail="Ambito operativo di Max" /><Stat label="Ultimo sync" value={snapshot.lastSyncAt ? formatDate(snapshot.lastSyncAt) : 'Mai'} detail={`Versione ${snapshot.appVersion}`} /></div><Card title="Attività recenti">{logs.length ? <div className="activity-list">{logs.slice(0, 6).map((log) => <div key={log.id}><span className={`log-dot ${log.level}`} /><div><strong>{log.message}</strong><small>{formatDate(log.createdAt)} · {log.eventType}</small></div></div>)}</div> : <EmptyState icon="◎" title="Nessuna attività">Le azioni di Max appariranno qui.</EmptyState>}</Card></div>; }
+function Dashboard({ snapshot, files, logs, onGoAgent, onSync }: { snapshot: AppSnapshot; files: LocalFile[]; logs: AuditEntry[]; onGoAgent: () => void; onSync: () => void }) { return <div className="page-grid"><Card className="hero-card"><div className="hero-copy"><span className="eyebrow">DIPENDENTE DIGITALE</span><h2>{snapshot.connection === 'connected' ? 'Max è pronto a lavorare.' : 'Max è offline.'}</h2><p>Dai a Max un obiettivo: legge i file, esegue comandi e crea cose in OnarSuite, in autonomia e con audit completo.</p><div className="hero-actions"><Button onClick={onGoAgent}>Apri l'agente</Button><Button variant="secondary" onClick={onSync}>Controlla connessione</Button></div></div><div className="orb"><BrandMark size={84} /><StatusPill state={snapshot.connection} /></div></Card><div className="stats-grid"><Stat label="Documenti visibili" value={String(files.length)} detail="Workspace e cartelle autorizzate" /><Stat label="Cartelle autorizzate" value={String(snapshot.authorizedFolders.length)} detail="Ambito operativo di Max" /><Stat label="Ultimo sync" value={snapshot.lastSyncAt ? formatDate(snapshot.lastSyncAt) : 'Mai'} detail={`Versione ${snapshot.appVersion}`} /></div><Card title="Attività recenti">{logs.length ? <div className="activity-list">{logs.slice(0, 6).map((log) => <div key={log.id}><span className={`log-dot ${log.level}`} /><div><strong>{log.message}</strong><small>{formatDate(log.createdAt)} · {log.eventType}</small></div></div>)}</div> : <EmptyState icon="activity" title="Nessuna attività">Le azioni di Max appariranno qui.</EmptyState>}</Card></div>; }
 function Stat({ label, value, detail }: { label: string; value: string; detail: string }) { return <Card><span className="stat-label">{label}</span><strong className="stat-value">{value}</strong><small>{detail}</small></Card>; }
 
-function FoldersView({ snapshot, busy, onAdd, onRemove, onDrop, onChoose }: { snapshot: AppSnapshot; busy: boolean; onAdd: () => void; onRemove: (folder: string) => void; onDrop: (event: DragEvent) => void; onChoose: () => void }) { return <div className="page-grid"><Card title="Ambito operativo di Max" action={<Button disabled={busy} onClick={onAdd}>Aggiungi cartella</Button>}><div className="permission-banner"><strong>Max lavora solo nelle cartelle qui sotto.</strong><span>Dentro l'allowlist può leggere, scrivere, modificare ed eseguire comandi. Fuori, è bloccato.</span></div><div className="drop-zone" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}><span>+</span><div><strong>Trascina qui i documenti</strong><small>per copiarli nella OnarSuite Workspace</small></div><Button variant="secondary" onClick={onChoose}>Scegli file</Button></div><div className="folder-list"><div><span className="folder-icon">▰</span><div><strong>OnarSuite Workspace</strong><small>{snapshot.workspacePath}</small></div><span className="fixed-badge">Sempre attiva</span></div>{snapshot.authorizedFolders.map((folder) => <div key={folder}><span className="folder-icon">▰</span><div><strong>{folder.split(/[\\/]/).pop()}</strong><small>{folder}</small></div><Button variant="ghost" onClick={() => onRemove(folder)}>Rimuovi</Button></div>)}</div></Card><Card title="Permessi"><div className="scope-columns"><div><strong>Consentiti (in autonomia)</strong>{MVP_SCOPES.map((scope) => <span key={scope} className="scope allowed">✓ {scope}</span>)}</div><div><strong>Sempre bloccati</strong>{BLOCKED_SCOPES.map((scope) => <span key={scope} className="scope blocked">× {scope}</span>)}</div></div></Card></div>; }
+function FoldersView({ snapshot, busy, onAdd, onRemove, onDrop, onChoose }: { snapshot: AppSnapshot; busy: boolean; onAdd: () => void; onRemove: (folder: string) => void; onDrop: (event: DragEvent) => void; onChoose: () => void }) { return <div className="page-grid"><Card title="Ambito operativo di Max" action={<Button disabled={busy} onClick={onAdd}>Aggiungi cartella</Button>}><div className="permission-banner"><strong>Max lavora solo nelle cartelle qui sotto.</strong><span>Dentro l'allowlist può leggere, scrivere, modificare ed eseguire comandi. Fuori, è bloccato.</span></div><div className="drop-zone" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}><GlassIcon name="upload" /><div><strong>Trascina qui i documenti</strong><small>per copiarli nella OnarSuite Workspace</small></div><Button variant="secondary" onClick={onChoose}>Scegli file</Button></div><div className="folder-list"><div><GlassIcon name="folder" className="folder-icon" /><div><strong>OnarSuite Workspace</strong><small>{snapshot.workspacePath}</small></div><span className="fixed-badge">Sempre attiva</span></div>{snapshot.authorizedFolders.map((folder) => <div key={folder}><GlassIcon name="folder" className="folder-icon" /><div><strong>{folder.split(/[\\/]/).pop()}</strong><small>{folder}</small></div><Button variant="ghost" onClick={() => onRemove(folder)}>Rimuovi</Button></div>)}</div></Card><Card title="Permessi"><div className="scope-columns"><div><strong>Consentiti (in autonomia)</strong>{MVP_SCOPES.map((scope) => <span key={scope} className="scope allowed">✓ {scope}</span>)}</div><div><strong>Sempre bloccati</strong>{BLOCKED_SCOPES.map((scope) => <span key={scope} className="scope blocked">× {scope}</span>)}</div></div></Card></div>; }
 
-function LogsView({ logs }: { logs: AuditEntry[] }) { return <Card title="Registro attività" eyebrow="AUDIT LOCALE"><div className="log-table"><div className="log-row head"><span>Data</span><span>Evento</span><span>Livello</span><span>Messaggio</span></div>{logs.map((log) => <div className="log-row" key={log.id}><span>{formatDate(log.createdAt)}</span><code>{log.eventType}</code><span><i className={`log-dot ${log.level}`} />{log.level}</span><strong>{log.message}</strong></div>)}</div>{!logs.length && <EmptyState icon="≡" title="Registro vuoto">Le azioni e gli errori compariranno qui.</EmptyState>}</Card>; }
+function LogsView({ logs }: { logs: AuditEntry[] }) { return <Card title="Registro attività" eyebrow="AUDIT LOCALE"><div className="log-table"><div className="log-row head"><span>Data</span><span>Evento</span><span>Livello</span><span>Messaggio</span></div>{logs.map((log) => <div className="log-row" key={log.id}><span>{formatDate(log.createdAt)}</span><code>{log.eventType}</code><span><i className={`log-dot ${log.level}`} />{log.level}</span><strong>{log.message}</strong></div>)}</div>{!logs.length && <EmptyState icon="activity" title="Registro vuoto">Le azioni e gli errori compariranno qui.</EmptyState>}</Card>; }
 
 function SettingsView({ snapshot, busy, onDisconnect, onClear }: { snapshot: AppSnapshot; busy: boolean; onDisconnect: () => void; onClear: () => void }) { return <div className="page-grid settings-grid"><Card title="Dispositivo"><dl><dt>Nome</dt><dd>{snapshot.deviceName}</dd><dt>ID dispositivo</dt><dd>{snapshot.deviceId}</dd><dt>Server</dt><dd>{snapshot.serverUrl}</dd><dt>Versione</dt><dd>{snapshot.appVersion}</dd><dt>Token locale</dt><dd>{snapshot.encryptionAvailable ? 'Cifrato con il sistema operativo' : 'Non persistito'}</dd></dl><Button variant="danger" disabled={busy} onClick={onDisconnect}>Disconnetti dispositivo</Button></Card><MemorySnapshots /><Card title="Privacy e dati locali"><p>Puoi cancellare configurazione, token, coda offline e audit locale. I documenti nelle cartelle autorizzate non vengono eliminati automaticamente.</p><Button variant="secondary" disabled={busy} onClick={onClear}>Cancella dati locali</Button></Card></div>; }
 
@@ -1236,7 +1236,7 @@ function ClientsView() {
                   <span>{String(user.type ?? '—')}</span>
                 </div>
               ))}
-              {!users.length && <EmptyState icon="◌" title="Nessun utente">Non ci sono utenti da mostrare.</EmptyState>}
+              {!users.length && <EmptyState icon="user" title="Nessun utente">Non ci sono utenti da mostrare.</EmptyState>}
             </div>
           )}
           <form className="module-form" onSubmit={submitUser}>
@@ -1256,7 +1256,7 @@ function ClientsView() {
                   <span>{String(lead.phone ?? '—')}</span>
                 </div>
               ))}
-              {!leads.length && <EmptyState icon="◉" title="Nessun cliente">Non ci sono clienti da mostrare.</EmptyState>}
+              {!leads.length && <EmptyState icon="clients" title="Nessun cliente">Non ci sono clienti da mostrare.</EmptyState>}
             </div>
           )}
           <form className="module-form" onSubmit={submitLead}>
@@ -1273,7 +1273,7 @@ function ClientsView() {
 }
 
 const viewTitles: Record<View, string> = { onarsuite: 'Skills di Max', clients: 'Clienti', agent: 'Agente Max', explorer: 'Esplora file', workspace: 'Virtual Workspace', graph: 'Grafo entità', dashboard: 'Panoramica', folders: 'Cartelle autorizzate', logs: 'Attività', settings: 'Impostazioni' };
-function iconFor(ext?: string) { if (!ext) return '▢'; if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return '▤'; if (['xlsx', 'csv'].includes(ext)) return '▦'; if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) return '▣'; return '◇'; }
+function iconFor(ext?: string): GlassIconName { if (!ext) return 'file'; if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return 'contract'; if (['xlsx', 'csv'].includes(ext)) return 'table'; if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) return 'image'; return 'file'; }
 function shortPath(value: string) { const parts = value.split(/[\\/]/); return parts.length > 3 ? `…/${parts.slice(-3).join('/')}` : value; }
 function formatBytes(value: number) { if (value < 1024) return `${value} B`; if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`; return `${(value / 1024 ** 2).toFixed(1)} MB`; }
 function formatDate(value: string) { return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
