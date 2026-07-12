@@ -235,7 +235,7 @@ export function App() {
   const dockW = dockView === 'closed' ? 0 : dockView === 'rail' ? 52 : dockView === 'expanded' ? Math.max(420, Math.min(Math.round(winW * 0.62), winW - sidebarWidth - 380)) : lockWidth;
   return <div className="app-shell" style={{ gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)${dockView !== 'closed' ? ` ${dockW}px` : ''}` }}>
     <aside className="sidebar">
-      <div className="brand"><AppLogo theme="dark" planName={snapshot.planName} /></div>
+      <div className="brand"><AppLogo theme={theme} planName={snapshot.planName} /></div>
       <button className="new-chat" onClick={() => void newChat()}><GlassIcon name="plus" />Nuova chat</button>
       <nav>{navItems.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><GlassIcon name={item.icon} />{item.label}</button>)}</nav>
       <div className="conv-section">
