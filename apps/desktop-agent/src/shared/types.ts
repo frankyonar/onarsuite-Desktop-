@@ -8,7 +8,7 @@ import type {
   WorkspaceStatus,
 } from './workspace';
 
-export const APP_VERSION = '0.9.48';
+export const APP_VERSION = '0.9.49';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -61,6 +61,7 @@ export type ToolName =
   | 'create_file'
   | 'delete_file'
   | 'run_shell'
+  | 'open_onarsuite_page'
   | 'onar_action'
   | 'onar_upload'
   | 'request_form';
@@ -133,6 +134,7 @@ export type AgentStreamEvent =
   | { type: 'status'; runId: string; text: string }
   | { type: 'assistant'; runId: string; text: string }
   | { type: 'assistant_action'; runId: string; actionId: string; action: string; route: string; mode: AssistantActionMode; title: string; openUrl: string; prefill: Record<string, unknown> }
+  | { type: 'dock_navigation'; runId: string; url: string; title: string }
   | { type: 'tool_start'; runId: string; id: string; tool: ToolName; title: string; command: string }
   | { type: 'tool_end'; runId: string; id: string; ok: boolean; preview: string; isDiff?: boolean }
   | { type: 'panel'; runId: string; panel: PanelData }

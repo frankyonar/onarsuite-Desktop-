@@ -88,6 +88,10 @@ export class AgentTools {
         command: { type: 'string', description: 'Comando da eseguire.' },
         cwd: { type: 'string', description: 'Cartella di lavoro (opzionale).' },
       }, ['command']),
+      fn('open_onarsuite_page', 'Apri davvero nel dock laterale una pagina della piattaforma OnarSuite. Usalo ogni volta che l\'utente chiede di aprire, mostrare o raggiungere una pagina, sezione o URL OnarSuite.', {
+        path: { type: 'string', description: 'Percorso relativo (es. /settings, /clients) oppure URL completo onarsuite.com.' },
+        title: { type: 'string', description: 'Titolo breve della pagina richiesta.' },
+      }, ['path']),
       fn('onar_action', 'Esegui un\'azione REALE su OnarSuite (stesso potere del Max in-app). Usa SEMPRE questo per agire su OnarSuite, mai messaggi di testo speciali.', {
         action_type: { type: 'string', description: 'Es: create_user {name,email,role_id,mobile_no?}, create_note {title,content}, create_reminder {title,date,description?}, create_contract {title,content,amount?}, create_ticket {subject,description}, create_product {name,price}, calendar_create_event {title,start,end}, drive_create_file {name,content}, library_search {query}, contract_search {query}, web_search {query}, news {topic?} (notizie verificate da Perplexity, topic vuoto = notizie di oggi).' },
         data: { type: 'object', description: 'Oggetto con i campi richiesti dall\'azione.' },
@@ -122,6 +126,7 @@ export class AgentTools {
       case 'create_file': return this.createFile(String(args.path ?? ''), String(args.content ?? ''));
       case 'delete_file': return this.deleteFile(String(args.path ?? ''));
       case 'run_shell': return this.runShell(String(args.command ?? ''), args.cwd ? String(args.cwd) : undefined);
+      case 'open_onarsuite_page': return this.openOnarSuitePage(String(args.path ?? ''), String(args.title ?? 'OnarSuite'));
       case 'onar_action': return this.onarAction(String(args.action_type ?? ''), (args.data as Record<string, unknown>) ?? {});
       case 'onar_upload': return this.onarUploadFile(String(args.path ?? ''));
       case 'request_form': return this.requestForm(args);
@@ -302,6 +307,26 @@ export class AgentTools {
       const message = error instanceof Error ? error.message : 'Azione OnarSuite fallita.';
       return { ok: false, content: message, preview: `${actionType} · errore` };
     }
+  }
+
+  private async openOnarSuitePage(rawPath: string, title: string): Promise<ToolResult> {
+    const value = rawPath.trim();
+    if (!value) return { ok: false, content: 'Percorso OnarSuite mancante.', preview: 'Pagina non specificata' };
+    let target = value;
+    if (/^https?:\/\//i.test(value)) {
+      try {
+        const url = new URL(value);
+        const host = url.hostname.toLowerCase().replace(/^www\./, '');
+        if (host !== 'onarsuite.com' && host !== 'ownersuite.com') return { ok: false, content: 'Posso aprire nel dock solo pagine OnarSuite.', preview: 'Dominio non consentito' };
+        target = `${url.pathname}${url.search}${url.hash}` || '/';
+      } catch {
+        return { ok: false, content: 'URL OnarSuite non valido.', preview: 'URL non valido' };
+      }
+    }
+    if (!target.startsWith('/')) target = `/${target}`;
+    const safeTitle = title.trim() || 'OnarSuite';
+    await this.log('agent_onarsuite_navigation', 'info', `Pagina OnarSuite aperta: ${safeTitle}`, { path: target });
+    return { ok: true, content: `Ho aperto ${safeTitle} nel dock.`, preview: `${safeTitle} · ${target}`, data: { url: target, title: safeTitle } };
   }
 
   private async onarUploadFile(p: string): Promise<ToolResult> {

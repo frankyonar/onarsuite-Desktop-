@@ -37,6 +37,10 @@ STRUMENTI (usa SOLO questi per agire — niente marcatori di testo):
 - Magic Panel: request_form(action, action_type, title, description, fields, prefill, confirmation_required) raccoglie dati strutturati e mostra una preview prima di un'azione reale. Usalo quando mancano più dati o l'utente deve verificare una scrittura.
   Per le NOTIZIE usa onar_action('news', {topic?}) — fonti giornalistiche verificate (Perplexity). topic vuoto = notizie principali di oggi.
 
+NAVIGAZIONE NEL DOCK:
+- open_onarsuite_page(path, title) apre DAVVERO qualsiasi pagina della piattaforma nel dock laterale. Usalo sempre quando l'utente dice apri, mostra o vai a una pagina o sezione OnarSuite. Accetta percorsi come "/settings" o URL OnarSuite completi.
+- Per aprire pagine non usare testo, marcatori o JSON: esegui il tool e comunica l'esito solo dopo il risultato.
+
 GENERAZIONE FILE E CODICE:
 - Sai scrivere codice in qualsiasi linguaggio (Python, JS/TS, HTML/CSS, PHP, SQL, shell, ecc.) e generare documenti.
 - Quando l'utente chiede di generare/creare codice o un file, NON limitarti a incollarlo in chat: crealo come FILE REALE con create_file (o write_file se esiste già), poi indica il percorso. Mostra anche un breve estratto nel messaggio.
@@ -173,6 +177,10 @@ export class AgentEngine {
           }
 
           emit({ type: 'tool_end', runId, id: call.id, ok: result.ok, preview: result.preview, isDiff: result.isDiff });
+          if (call.function.name === 'open_onarsuite_page' && result.ok) {
+            const navigation = result.data as { url?: unknown; title?: unknown } | undefined;
+            if (typeof navigation?.url === 'string') emit({ type: 'dock_navigation', runId, url: navigation.url, title: typeof navigation.title === 'string' ? navigation.title : 'OnarSuite' });
+          }
           const panel = buildPanel(call.function.name, args, result);
           if (panel) emit({ type: 'panel', runId, panel });
           this.messages.push({ role: 'tool', tool_call_id: call.id, name: call.function.name, content: result.content });
@@ -206,6 +214,7 @@ function describe(tool: ToolName, args: Record<string, unknown>): { title: strin
     case 'create_file': return { title: 'Creazione', command: `create · ${base}` };
     case 'delete_file': return { title: 'Eliminazione', command: `delete · ${base}` };
     case 'run_shell': return { title: 'Shell', command: `run · ${String(args.command ?? '')}` };
+    case 'open_onarsuite_page': return { title: 'Navigazione', command: `open · ${String(args.path ?? '/')}` };
     case 'onar_action': return { title: 'OnarSuite', command: `${String(args.action_type ?? 'azione')}` };
     case 'onar_upload': return { title: 'OnarSuite', command: `upload · ${base}` };
     case 'request_form': return { title: 'Magic Panel', command: `form · ${String(args.title ?? args.action ?? 'dati')}` };

@@ -1243,3 +1243,121 @@ body::after {
 
 @media (max-width: 1050px) { .hero-card { padding: 30px; } .orb { width: 130px; height: 130px; } .files-layout, .explorer { grid-template-columns: 1fr; } .file-detail { position: static; } .log-row { grid-template-columns: 120px 150px 90px 1fr; } .agent-layout { flex-direction: column; height: auto; } .side-panel { width: 100%; max-height: 320px; } }
 @media (max-width: 800px) { .app-shell { grid-template-columns: 72px 1fr; } .sidebar { padding-inline: 10px; } .plan-badge, .sidebar nav button:not(.active) { font-size: 0; } .sidebar nav button { justify-content: center; } .sidebar nav button > span { font-size: 18px; } .sidebar-status small, .sidebar-version { display: none; } .main-content { padding: 24px 20px; } .stats-grid, .settings-grid, .prompt-grid { grid-template-columns: 1fr; } .pairing-page { grid-template-columns: 1fr; } .pairing-copy { display: none; } .chat-stream, .console-stream { padding-inline: 20px; } .app-logo-mark { max-width: 122px; } }
+
+/* OnarSuite web parity — the desktop shell now uses the same quiet, flat dark
+   workspace language as the authenticated platform shown inside the dock. */
+[data-theme='dark'] {
+  --canvas: #0f1115;
+  --canvas-grad: linear-gradient(#0f1115, #0f1115);
+  --ink: #f4f5f7;
+  --muted: #a6a9b2;
+  --faint: #747985;
+  --border: #292d35;
+  --border-soft: #20242b;
+  --glass: #15171c;
+  --glass-strong: #1a1d23;
+  --glass-border: #292d35;
+  --glass-fill: #15171c;
+  --glass-sheen: transparent;
+  --glass-blur: 0px;
+  --glass-saturate: 100%;
+  --glass-shadow: none;
+  --hover: #1d2027;
+  --brand: #2276f5;
+  --brand-strong: #1267e8;
+  --brand-ink: #69a2ff;
+  --brand-soft: rgba(34,118,245,.16);
+  --brand-tint: rgba(34,118,245,.10);
+  --ring: #4c91ff;
+}
+
+[data-theme='dark'] body,
+[data-theme='dark'] .app-shell { background: #0f1115; background-image: none; }
+[data-theme='dark'] body::before,
+[data-theme='dark'] body::after,
+[data-theme='dark'] .card::before,
+[data-theme='dark'] .composer::before,
+[data-theme='dark'] .module-card::before,
+[data-theme='dark'] .dock::before,
+[data-theme='dark'] .tool-card::before { display: none; }
+
+[data-theme='dark'] .sidebar {
+  background: #121419;
+  border-right: 1px solid #282c34;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+[data-theme='dark'] .sidebar::before { display: none; }
+[data-theme='dark'] .new-chat,
+[data-theme='dark'] .conv-search input,
+[data-theme='dark'] .conv-rename { background: #1a1d23; border-color: #30343d; }
+[data-theme='dark'] .new-chat:hover,
+[data-theme='dark'] .conv-item:hover,
+[data-theme='dark'] .sidebar nav button:hover { background: #1d2027; border-color: #30343d; }
+[data-theme='dark'] .conv-item.active,
+[data-theme='dark'] .sidebar nav button.active {
+  background: #20242b;
+  border-color: #393e48;
+  box-shadow: none;
+}
+[data-theme='dark'] .sidebar nav button.active::before { background: #2276f5; box-shadow: none; }
+
+[data-theme='dark'] .main-content { background: #0f1115; }
+[data-theme='dark'] .topbar {
+  min-height: 48px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+[data-theme='dark'] .topbar-icon {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #2b2f37;
+  border-radius: 10px;
+  background: #181b20;
+  box-shadow: none;
+}
+[data-theme='dark'] .topbar-icon:hover:not(:disabled),
+[data-theme='dark'] .topbar-icon.active { background: #22262d; border-color: #3a404a; }
+
+[data-theme='dark'] .view-agent .composer,
+[data-theme='dark'] .card,
+[data-theme='dark'] .tool-card,
+[data-theme='dark'] .module-card,
+[data-theme='dark'] .notice,
+[data-theme='dark'] .permission-banner,
+[data-theme='dark'] .update-banner {
+  border-color: #2b2f37;
+  background: #17191f;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+[data-theme='dark'] .view-agent .composer { border-radius: 16px; }
+[data-theme='dark'] .turn-user .bubble {
+  background: #1b2535;
+  border-color: #263a57;
+  color: #f4f7fb;
+  box-shadow: none;
+}
+[data-theme='dark'] .prompt-pills button { background: #17191f; border-color: #2b2f37; }
+[data-theme='dark'] .prompt-pills button:hover { background: #1d2027; border-color: #3a404a; }
+[data-theme='dark'] .composer-send { background: #2276f5; box-shadow: none; }
+
+[data-theme='dark'] .dock {
+  border-left: 1px solid #2b2f37;
+  background: #121419;
+  box-shadow: -12px 0 30px rgba(0,0,0,.24);
+  backdrop-filter: none;
+}
+[data-theme='dark'] .dock-head,
+[data-theme='dark'] .dock-tabs,
+[data-theme='dark'] .dock-output-list,
+[data-theme='dark'] .lock-web-bar { border-color: #292d35; background: #15171c; }
+[data-theme='dark'] .dock-tabs { padding: 8px 10px; }
+[data-theme='dark'] .dock-tabs button { border-radius: 8px; }
+[data-theme='dark'] .dock-tabs button.active,
+[data-theme='dark'] .dock-output-list button.active,
+[data-theme='dark'] .dock-rail-btn.active { background: #232833; color: #8ab5ff; box-shadow: none; }
+[data-theme='dark'] .lock-web-frame { background: #0f1115; }

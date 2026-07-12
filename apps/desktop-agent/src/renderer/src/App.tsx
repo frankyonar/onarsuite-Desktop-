@@ -14,7 +14,7 @@ function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('max-theme') as Theme | null;
     if (saved) return saved;
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return 'dark';
   });
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -287,7 +287,7 @@ export function App() {
       {notice && <div className={`notice notice-${notice.tone}`}><span>{notice.text}</span><button onClick={() => setNotice(undefined)}>×</button></div>}
       {view === 'onarsuite' && <OnarHome onNotice={setNotice} onGoClients={() => setView('clients')} />}
       {view === 'clients' && <ClientsView />}
-      {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} externalItems={actionMessages.filter((entry) => entry.conversationId === activeConv.id).map((entry) => entry.item)} onPersist={(items) => void persistConversation(activeConv.id, items)} onPanel={showPanel} onAssistantAction={(openUrl) => { const nextPath = openUrl ? new URL(openUrl).pathname + new URL(openUrl).search : undefined; openWebDock(nextPath); setNotice({ tone: 'success', text: 'Max ha preparato questa operazione nel pannello laterale.' }); }} onTitle={(id) => void titleConversation(id)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
+      {view === 'agent' && activeConv && <AgentConsole key={chatKey} convId={activeConv.id} initialItems={activeConv.items} externalItems={actionMessages.filter((entry) => entry.conversationId === activeConv.id).map((entry) => entry.item)} onPersist={(items) => void persistConversation(activeConv.id, items)} onPanel={showPanel} onAssistantAction={(openUrl) => { const nextPath = openUrl ? new URL(openUrl).pathname + new URL(openUrl).search : undefined; openWebDock(nextPath); setNotice({ tone: 'success', text: 'Max ha preparato questa operazione nel pannello laterale.' }); }} onDockNavigation={(url, title) => { openWebDock(url); setNotice({ tone: 'success', text: `${title} aperta nel dock.` }); }} onTitle={(id) => void titleConversation(id)} attachments={attachments} onAttachmentsChange={setAttachments} onAfterRun={() => void refresh()} accountLabel={snapshot.accountLabel} />}
       {view === 'explorer' && <ExplorerView onNotice={setNotice} />}
       {view === 'workspace' && <WorkspaceView onNotice={setNotice} />}
       {view === 'graph' && <GraphView onNotice={setNotice} />}
@@ -342,7 +342,7 @@ const SUGGESTIONS = [
   'Mostrami le attività di oggi',
 ];
 
-function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel, onAssistantAction, onTitle, attachments, onAttachmentsChange, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; externalItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; onPanel: (panel: PanelData) => void; onAssistantAction: (openUrl: string) => void; onTitle: (id: string) => void; attachments: LocalFile[]; onAttachmentsChange: (files: LocalFile[]) => void; onAfterRun: () => void; accountLabel?: string }) {
+function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel, onAssistantAction, onDockNavigation, onTitle, attachments, onAttachmentsChange, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; externalItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; onPanel: (panel: PanelData) => void; onAssistantAction: (openUrl: string) => void; onDockNavigation: (url: string, title: string) => void; onTitle: (id: string) => void; attachments: LocalFile[]; onAttachmentsChange: (files: LocalFile[]) => void; onAfterRun: () => void; accountLabel?: string }) {
   const [items, setItems] = useState<ConsoleItem[]>(initialItems);
   const [status, setStatus] = useState<string>();
   const [running, setRunning] = useState(false);
@@ -358,6 +358,7 @@ function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel,
       if (event.type === 'panel') onPanel(event.panel);
       if (event.type === 'form') onPanel(event.panel);
       if (event.type === 'assistant_action') onAssistantAction(event.openUrl);
+      if (event.type === 'dock_navigation') onDockNavigation(event.url, event.title);
       if (event.type === 'done' || event.type === 'error') { setRunning(false); setStatus(undefined); }
     });
     return unsubscribe;
