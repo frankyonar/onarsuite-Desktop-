@@ -1,5 +1,5 @@
 ﻿import { createElement, useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
-import type { AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
+import type { AgentRunMode, AgentStreamEvent, AppSnapshot, AuditEntry, ChatMessage, ConsoleItem, ConversationMeta, FsEntry, LocalFile, PairingInput, PanelData, UpdateState } from '../../shared/types';
 import { APP_VERSION, BLOCKED_SCOPES, MVP_SCOPES } from '../../shared/types';
 import type { MemoryGraph, MemoryGraphNode, MemorySnapshotMeta } from '../../shared/types';
 import type { ProviderDescriptor, WorkspaceSearchResult } from '../../shared/workspace';
@@ -336,10 +336,10 @@ function PairingPage({ snapshot, busy, notice, onPair }: { snapshot: AppSnapshot
 }
 
 const SUGGESTIONS = [
-  'Crea un nuovo cliente',
-  'Genera uno script Python che…',
-  'Crea una pagina HTML di esempio',
-  'Mostrami le attività di oggi',
+  'Fammi il briefing aziendale di oggi e dimmi le 3 priorità',
+  'Trova clienti o trattative ferme e prepara i follow-up',
+  'Controlla scadenze, calendario e incassi dei prossimi 7 giorni',
+  'Analizza la mia azienda e proponi cosa automatizzare',
 ];
 
 function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel, onAssistantAction, onDockNavigation, onTitle, attachments, onAttachmentsChange, onAfterRun, accountLabel }: { convId: string; initialItems: ConsoleItem[]; externalItems: ConsoleItem[]; onPersist: (items: ConsoleItem[]) => void; onPanel: (panel: PanelData) => void; onAssistantAction: (openUrl: string) => void; onDockNavigation: (url: string, title: string) => void; onTitle: (id: string) => void; attachments: LocalFile[]; onAttachmentsChange: (files: LocalFile[]) => void; onAfterRun: () => void; accountLabel?: string }) {
@@ -348,6 +348,7 @@ function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel,
   const [running, setRunning] = useState(false);
   const [text, setText] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [runMode, setRunMode] = useState<AgentRunMode>(() => (localStorage.getItem('max-run-mode') as AgentRunMode) || 'execute');
   const streamRef = useRef<HTMLDivElement>(null);
   const titledRef = useRef(initialItems.length > 0);
 
@@ -366,6 +367,7 @@ function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel,
   }, []);
 
   useEffect(() => { streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: 'smooth' }); }, [items, status]);
+  useEffect(() => { localStorage.setItem('max-run-mode', runMode); }, [runMode]);
 
   useEffect(() => {
     setItems((current) => {
@@ -395,7 +397,7 @@ function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel,
     const history: ChatMessage[] = items
       .filter((item): item is Extract<ConsoleItem, { kind: 'user' | 'assistant' }> => item.kind === 'user' || item.kind === 'assistant')
       .map((item) => ({ id: item.id, role: item.kind, content: item.text, createdAt: new Date().toISOString() }));
-    try { await window.maxDesktop.runAgent({ message, history, filePaths, conversationId: convId }); }
+    try { await window.maxDesktop.runAgent({ message, history, filePaths, conversationId: convId, mode: runMode }); }
     catch (error) { setItems((prev) => [...prev, { kind: 'assistant', id: crypto.randomUUID(), text: `⚠ ${errorText(error)}` }]); setRunning(false); setStatus(undefined); }
     finally { onAfterRun(); }
   };
@@ -451,7 +453,11 @@ function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel,
       placeholder="Scrivi a Max…" />
     <div className="composer-toolbar">
       <button type="button" className="composer-attach" onClick={() => void attach()} title="Allega uno o più file">+</button>
-      <span className="composer-mode" title="Max agisce in autonomia; ogni azione è registrata">Autonomo</span>
+      <select className="composer-mode-select" value={runMode} onChange={(event) => setRunMode(event.target.value as AgentRunMode)} title="Scegli come deve lavorare Max">
+        <option value="execute">Esegui</option>
+        <option value="plan">Pianifica</option>
+        <option value="audit">Controlla</option>
+      </select>
       {running
         ? <button type="button" className="composer-send stop" onClick={stop} title="Ferma">■</button>
         : <button type="submit" className="composer-send" disabled={!text.trim() && attachments.length === 0} title="Invia">↑</button>}

@@ -92,6 +92,10 @@ export class AgentTools {
         path: { type: 'string', description: 'Percorso relativo (es. /settings, /clients) oppure URL completo onarsuite.com.' },
         title: { type: 'string', description: 'Titolo breve della pagina richiesta.' },
       }, ['path']),
+      fn('business_brief', 'Costruisci una fotografia operativa LIVE dell’azienda raccogliendo in parallelo promemoria, calendario, contratti, clienti e situazione Stripe. Usalo per briefing quotidiani, priorità, controllo aziendale, follow-up e pianificazione.', {
+        horizon_days: { type: 'number', description: 'Orizzonte del briefing in giorni, da 1 a 30. Default 7.' },
+        focus: { type: 'string', description: 'Focus opzionale: generale, vendite, incassi, clienti, scadenze.' },
+      }, []),
       fn('onar_action', 'Esegui un\'azione REALE su OnarSuite (stesso potere del Max in-app). Usa SEMPRE questo per agire su OnarSuite, mai messaggi di testo speciali.', {
         action_type: { type: 'string', description: 'Es: create_user {name,email,role_id,mobile_no?}, create_note {title,content}, create_reminder {title,date,description?}, create_contract {title,content,amount?}, create_ticket {subject,description}, create_product {name,price}, calendar_create_event {title,start,end}, drive_create_file {name,content}, library_search {query}, contract_search {query}, web_search {query}, news {topic?} (notizie verificate da Perplexity, topic vuoto = notizie di oggi).' },
         data: { type: 'object', description: 'Oggetto con i campi richiesti dall\'azione.' },
@@ -127,6 +131,7 @@ export class AgentTools {
       case 'delete_file': return this.deleteFile(String(args.path ?? ''));
       case 'run_shell': return this.runShell(String(args.command ?? ''), args.cwd ? String(args.cwd) : undefined);
       case 'open_onarsuite_page': return this.openOnarSuitePage(String(args.path ?? ''), String(args.title ?? 'OnarSuite'));
+      case 'business_brief': return this.businessBrief(Number(args.horizon_days ?? 7), String(args.focus ?? 'generale'));
       case 'onar_action': return this.onarAction(String(args.action_type ?? ''), (args.data as Record<string, unknown>) ?? {});
       case 'onar_upload': return this.onarUploadFile(String(args.path ?? ''));
       case 'request_form': return this.requestForm(args);
@@ -329,6 +334,45 @@ export class AgentTools {
     return { ok: true, content: `Ho aperto ${safeTitle} nel dock.`, preview: `${safeTitle} · ${target}`, data: { url: target, title: safeTitle } };
   }
 
+  private async businessBrief(rawHorizon: number, focus: string): Promise<ToolResult> {
+    const horizonDays = Math.max(1, Math.min(30, Number.isFinite(rawHorizon) ? Math.round(rawHorizon) : 7));
+    const start = new Date();
+    const end = new Date(start);
+    end.setDate(end.getDate() + horizonDays);
+    const date = (value: Date) => value.toISOString().slice(0, 10);
+    const requests: Array<{ key: string; label: string; action: string; data: Record<string, unknown> }> = [
+      { key: 'reminders', label: 'Promemoria', action: 'list_reminders', data: { limit: 30 } },
+      { key: 'calendar', label: 'Calendario', action: 'calendar_list_events', data: { start_date: date(start), end_date: date(end), limit: 30 } },
+      { key: 'contracts', label: 'Contratti', action: 'contract_list', data: { limit: 30 } },
+      { key: 'customers', label: 'Clienti', action: 'list_unified_contacts', data: { limit: 30 } },
+      { key: 'payments', label: 'Incassi Stripe', action: 'stripe_list_payments', data: { limit: 30 } },
+      { key: 'balance', label: 'Saldo Stripe', action: 'stripe_balance', data: {} },
+    ];
+    const settled = await Promise.all(requests.map(async (request) => {
+      try {
+        return { request, result: await this.onarExecute(request.action, request.data) };
+      } catch (error) {
+        return { request, result: { success: false, message: error instanceof Error ? error.message : 'Modulo non disponibile.', data: undefined } };
+      }
+    }));
+    const sections = settled.map(({ request, result }) => ({
+      key: request.key,
+      label: request.label,
+      ok: result.success,
+      message: result.message,
+      data: result.data,
+      count: countBusinessItems(result.data),
+    }));
+    const available = sections.filter((section) => section.ok).length;
+    await this.log('agent_business_brief', 'info', 'Briefing aziendale generato', { horizonDays, focus: focus.slice(0, 80), available, total: sections.length });
+    return {
+      ok: available > 0,
+      content: JSON.stringify({ generated_at: new Date().toISOString(), horizon_days: horizonDays, focus, sections }, null, 2),
+      preview: `Briefing ${focus || 'generale'} · ${available}/${sections.length} fonti`,
+      data: { generatedAt: new Date().toISOString(), horizonDays, focus, sections },
+    };
+  }
+
   private async onarUploadFile(p: string): Promise<ToolResult> {
     const target = await this.assertInside(p);
     const result = await this.onarUpload(target);
@@ -400,6 +444,15 @@ function ok(content: string, preview: string): ToolResult {
 
 function cap(text: string): string {
   return text.length > MAX_TOOL_OUTPUT ? `${text.slice(0, MAX_TOOL_OUTPUT)}\n… (troncato)` : text;
+}
+
+function countBusinessItems(value: unknown): number | undefined {
+  if (Array.isArray(value)) return value.length;
+  if (!value || typeof value !== 'object') return undefined;
+  for (const nested of Object.values(value as Record<string, unknown>)) {
+    if (Array.isArray(nested)) return nested.length;
+  }
+  return undefined;
 }
 
 function headPreview(target: string, content: string): string {

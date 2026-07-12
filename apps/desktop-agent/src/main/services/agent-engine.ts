@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentMessage, AgentStreamEvent, ChatMessage, PanelData, PanelField, ToolName } from '../../shared/types';
+import type { AgentMessage, AgentRunMode, AgentStreamEvent, ChatMessage, PanelData, PanelField, ToolName } from '../../shared/types';
 import type { AuditLog } from './audit-log';
 import type { AgentSdk } from './agent-sdk';
 import type { AgentTools } from './tools';
@@ -40,6 +40,13 @@ STRUMENTI (usa SOLO questi per agire — niente marcatori di testo):
 NAVIGAZIONE NEL DOCK:
 - open_onarsuite_page(path, title) apre DAVVERO qualsiasi pagina della piattaforma nel dock laterale. Usalo sempre quando l'utente dice apri, mostra o vai a una pagina o sezione OnarSuite. Accetta percorsi come "/settings" o URL OnarSuite completi.
 - Per aprire pagine non usare testo, marcatori o JSON: esegui il tool e comunica l'esito solo dopo il risultato.
+
+METODO DA DIPENDENTE DIGITALE:
+- Per richieste aziendali ampie: raccogli prima i fatti con business_brief e/o gli strumenti OnarSuite, identifica priorità, dipendenze e rischi, poi esegui i passi sicuri in ordine.
+- Non fermarti alla prima azione se l'obiettivo richiede più passaggi: continua fino a completamento, blocco reale o necessità di conferma.
+- Dopo ogni scrittura verifica il risultato restituito; se fallisce, diagnostica e prova un'alternativa sicura. Non nascondere risultati parziali.
+- Distingui sempre fatti osservati, deduzioni e suggerimenti. Evidenzia scadenze, incassi, clienti fermi e prossime azioni quando sono rilevanti.
+- Le azioni distruttive, irreversibili, finanziarie o di invio esterno richiedono conferma esplicita nel Magic Panel.
 
 GENERAZIONE FILE E CODICE:
 - Sai scrivere codice in qualsiasi linguaggio (Python, JS/TS, HTML/CSS, PHP, SQL, shell, ecc.) e generare documenti.
@@ -114,14 +121,18 @@ export class AgentEngine {
     if (this.running) this.canceled = true;
   }
 
-  async run(userMessage: string, fileContext: string | undefined, emit: (event: AgentStreamEvent) => void): Promise<void> {
+  async run(userMessage: string, fileContext: string | undefined, emit: (event: AgentStreamEvent) => void, mode: AgentRunMode = 'execute'): Promise<void> {
     const runId = randomUUID();
     this.canceled = false;
     this.running = true;
 
-    const content = fileContext
-      ? `${userMessage}\n\n[Contesto file selezionato]\n${fileContext}`
-      : userMessage;
+    const modeInstruction: Record<AgentRunMode, string> = {
+      execute: 'MODALITÀ ESECUZIONE: porta avanti l’obiettivo in autonomia usando gli strumenti. Chiedi conferma soltanto per azioni sensibili, distruttive, finanziarie o di invio esterno.',
+      plan: 'MODALITÀ PIANO: analizza e prepara un piano operativo dettagliato con priorità, dipendenze, dati mancanti e criteri di completamento. Non eseguire scritture e non modificare dati o file.',
+      audit: 'MODALITÀ CONTROLLO: esegui solo letture, cerca anomalie, rischi, ritardi e opportunità, cita le evidenze disponibili e proponi correzioni. Non eseguire scritture.',
+    };
+    const baseContent = `${userMessage}\n\n[${modeInstruction[mode]}]`;
+    const content = fileContext ? `${baseContent}\n\n[Contesto file selezionato]\n${fileContext}` : baseContent;
     this.messages.push({ role: 'user', content });
 
     const toolDefs = this.tools.definitions();
@@ -170,7 +181,9 @@ export class AgentEngine {
           emit({ type: 'tool_start', runId, id: call.id, tool: call.function.name as ToolName, title, command });
 
           let result;
-          try {
+          if (mode !== 'execute' && !isReadOnlyTool(call.function.name, args)) {
+            result = { ok: false, content: `Azione bloccata dalla modalità ${mode}: sono consentite solo letture.`, preview: 'Bloccata dalla modalità operativa' };
+          } else try {
             result = await this.tools.execute(call.function.name, args);
           } catch (error) {
             result = { ok: false, content: errorText(error), preview: errorText(error) };
@@ -200,6 +213,21 @@ function safeParse(raw: string): Record<string, unknown> {
   try { return JSON.parse(raw || '{}'); } catch { return {}; }
 }
 
+const READ_ONLY_TOOLS = new Set(['read_file', 'list_dir', 'search_files', 'search_memory', 'workspace_context', 'business_brief']);
+const READ_ONLY_ONAR_ACTIONS = new Set([
+  'news', 'web_search', 'web_fetch', 'library_search', 'library_read_file',
+  'contract_list', 'contract_search', 'contract_summarize', 'list_reminders', 'list_users', 'list_leads', 'list_unified_contacts',
+  'calendar_list_events', 'calendar_search_events', 'drive_list_items', 'drive_search_items',
+  'ai_email_list', 'ai_email_view_thread', 'ai_email_read_full', 'ai_email_search',
+  'stripe_list_payments', 'stripe_list_customers', 'stripe_balance',
+]);
+
+export function isReadOnlyTool(name: string, args: Record<string, unknown>): boolean {
+  if (READ_ONLY_TOOLS.has(name)) return true;
+  if (name === 'onar_action') return READ_ONLY_ONAR_ACTIONS.has(String(args.action_type ?? ''));
+  return READ_ONLY_ONAR_ACTIONS.has(name);
+}
+
 function describe(tool: ToolName, args: Record<string, unknown>): { title: string; command: string } {
   const p = typeof args.path === 'string' ? args.path : '';
   const base = p ? p.split(/[\\/]/).pop() ?? p : '';
@@ -215,6 +243,7 @@ function describe(tool: ToolName, args: Record<string, unknown>): { title: strin
     case 'delete_file': return { title: 'Eliminazione', command: `delete · ${base}` };
     case 'run_shell': return { title: 'Shell', command: `run · ${String(args.command ?? '')}` };
     case 'open_onarsuite_page': return { title: 'Navigazione', command: `open · ${String(args.path ?? '/')}` };
+    case 'business_brief': return { title: 'Cabina di regia', command: `brief · ${String(args.horizon_days ?? 7)} giorni` };
     case 'onar_action': return { title: 'OnarSuite', command: `${String(args.action_type ?? 'azione')}` };
     case 'onar_upload': return { title: 'OnarSuite', command: `upload · ${base}` };
     case 'request_form': return { title: 'Magic Panel', command: `form · ${String(args.title ?? args.action ?? 'dati')}` };
@@ -260,6 +289,24 @@ export function buildPanel(tool: string, args: Record<string, unknown>, result: 
     }
     return links;
   };
+
+  if (tool === 'business_brief' && result.ok) {
+    const brief = result.data as { generatedAt?: string; horizonDays?: number; focus?: string; sections?: Array<{ label?: string; ok?: boolean; count?: number; message?: string }> } | undefined;
+    const sections = Array.isArray(brief?.sections) ? brief.sections : [];
+    return {
+      kind: 'table',
+      title: 'Cabina di regia aziendale',
+      subtitle: `Orizzonte ${brief?.horizonDays ?? 7} giorni · focus ${brief?.focus || 'generale'}`,
+      ok: true,
+      columns: ['Area', 'Stato', 'Elementi', 'Sintesi'],
+      rows: sections.map((section) => [
+        str(section.label) || 'Area',
+        section.ok ? 'Disponibile' : 'Non disponibile',
+        typeof section.count === 'number' ? String(section.count) : '—',
+        compact(str(section.message), 120) || '—',
+      ]),
+    };
+  }
 
   if (tool === 'request_form' && result.ok) {
     const data = (result.data ?? args) as Record<string, unknown>;

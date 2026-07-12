@@ -8,7 +8,7 @@ import type {
   WorkspaceStatus,
 } from './workspace';
 
-export const APP_VERSION = '0.9.50';
+export const APP_VERSION = '0.9.51';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -62,6 +62,7 @@ export type ToolName =
   | 'delete_file'
   | 'run_shell'
   | 'open_onarsuite_page'
+  | 'business_brief'
   | 'onar_action'
   | 'onar_upload'
   | 'request_form';
@@ -142,12 +143,16 @@ export type AgentStreamEvent =
   | { type: 'done'; runId: string }
   | { type: 'error'; runId: string; message: string };
 
+export type AgentRunMode = 'execute' | 'plan' | 'audit';
+
 export interface AgentRunInput {
   message: string;
   /** Prior plain chat turns shown in the console, for continuity. */
   history: ChatMessage[];
   conversationId?: string;
   filePaths?: string[];
+  /** execute = agisce, plan = prepara soltanto il piano, audit = analizza rischi e anomalie senza scrivere. */
+  mode?: AgentRunMode;
 }
 
 /** One rendered item in the chat transcript (UI). */

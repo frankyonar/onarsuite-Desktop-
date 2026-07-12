@@ -390,7 +390,8 @@ export class DesktopRuntime {
     }
     this.engine.mergePlainHistory(input.history);
 
-    const assistantOutcome = await this.assistantActions.handleMessage(input.conversationId, message);
+    const mode = input.mode ?? 'execute';
+    const assistantOutcome = mode === 'execute' ? await this.assistantActions.handleMessage(input.conversationId, message) : null;
     if (assistantOutcome) {
       this.engine.recordExchange(message, assistantOutcome.text);
       emit({ type: 'assistant', runId: 'assistant', text: assistantOutcome.text });
@@ -425,8 +426,8 @@ export class DesktopRuntime {
       fileContext = parts.join('\n\n---\n\n');
     }
 
-    await this.audit.write('agent_run_started', 'info', 'Avvio run agente Max', { hasFileContext: Boolean(fileContext) });
-    await this.engine.run(message, fileContext, emit);
+    await this.audit.write('agent_run_started', 'info', 'Avvio run agente Max', { hasFileContext: Boolean(fileContext), mode });
+    await this.engine.run(message, fileContext, emit, mode);
     this.connection = 'connected';
     await this.config.update({ lastSyncAt: new Date().toISOString() });
   }
