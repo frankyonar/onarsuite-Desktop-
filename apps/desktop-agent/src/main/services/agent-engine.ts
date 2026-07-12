@@ -213,7 +213,7 @@ function safeParse(raw: string): Record<string, unknown> {
   try { return JSON.parse(raw || '{}'); } catch { return {}; }
 }
 
-const READ_ONLY_TOOLS = new Set(['read_file', 'list_dir', 'search_files', 'search_memory', 'workspace_context', 'business_brief']);
+const READ_ONLY_TOOLS = new Set(['read_file', 'list_dir', 'search_files', 'search_memory', 'workspace_context', 'business_brief', 'open_onarsuite_page']);
 const READ_ONLY_ONAR_ACTIONS = new Set([
   'news', 'web_search', 'web_fetch', 'library_search', 'library_read_file',
   'contract_list', 'contract_search', 'contract_summarize', 'list_reminders', 'list_users', 'list_leads', 'list_unified_contacts',

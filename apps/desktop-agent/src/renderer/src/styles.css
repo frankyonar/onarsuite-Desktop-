@@ -316,8 +316,15 @@ h1, h2, h3, .brand strong { font-family: var(--font-display); font-weight: 600; 
 .composer-attach { width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--hover); color: var(--muted); font-size: 17px; transition: background .16s, color .16s, transform .16s; }
 .composer-attach:hover { background: var(--brand-soft); color: var(--brand-ink); transform: translateY(-1px); }
 .composer-mode { color: var(--muted); font-size: 11px; }
-.composer-mode-select { min-height: 30px; border: 0; border-radius: 8px; padding: 0 24px 0 8px; background: var(--hover); color: var(--muted); font-size: 11px; outline: none; cursor: pointer; }
-.composer-mode-select:hover, .composer-mode-select:focus { color: var(--ink); background: var(--brand-soft); }
+.composer-mode-control { --mode-color: #3b82f6; --mode-bg: rgba(59,130,246,.14); display: inline-flex; align-items: center; gap: 6px; min-height: 34px; border: 1px solid color-mix(in srgb, var(--mode-color) 38%, transparent); border-radius: 10px; padding: 0 5px 0 9px; background: var(--mode-bg); color: var(--ink); cursor: pointer; }
+.composer-mode-control.mode-plan { --mode-color: #a78bfa; --mode-bg: rgba(139,92,246,.16); }
+.composer-mode-control.mode-audit { --mode-color: #f59e0b; --mode-bg: rgba(245,158,11,.15); }
+.composer-mode-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--mode-color); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mode-color) 18%, transparent); }
+.composer-mode-label { color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.composer-mode-select { min-height: 28px; border: 0; padding: 0 22px 0 3px; background: transparent; color: var(--ink); font-size: 12px; font-weight: 650; outline: none; cursor: pointer; }
+.composer-mode-select option { background: var(--glass-strong); color: var(--ink); }
+.composer-mode-control:hover, .composer-mode-control:focus-within { border-color: var(--mode-color); }
+@media (max-width: 760px) { .composer-mode-label { display: none; } }
 .composer-send { width: 34px; height: 34px; margin-left: auto; flex: 0 0 auto; display: grid; place-items: center; border: 0; border-radius: 50%; background: linear-gradient(180deg, #60a5fa, #2563eb); color: #fff; font-size: 16px; font-weight: 700; box-shadow: 0 10px 18px rgba(37,99,235,.22); transition: opacity .12s, transform .12s, background .12s; }
 .composer-send:hover:not(:disabled) { transform: translateY(-1px); }
 .composer-send:disabled { background: #e8edf4; color: #9aa5b4; box-shadow: none; }

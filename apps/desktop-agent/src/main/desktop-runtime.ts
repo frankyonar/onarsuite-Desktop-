@@ -12,6 +12,7 @@ import { AuditLog } from './services/audit-log';
 import { ConfigStore } from './services/config-store';
 import { isSupportedFile, parseDocument } from './services/document-parser';
 import { AssistantActionOrchestrator } from './services/assistant-actions';
+import { detectOnarSuiteNavigation } from './services/onarsuite-navigation';
 import { OnarOwnerMemoryEngine } from './services/owner-memory/owner-memory-engine';
 import { VirtualWorkspace } from './services/workspace/virtual-workspace';
 import { LocalMemoryProvider } from './services/workspace/local-memory-provider';
@@ -389,6 +390,17 @@ export class DesktopRuntime {
       await this.selectConversation(input.conversationId);
     }
     this.engine.mergePlainHistory(input.history);
+
+    const navigation = detectOnarSuiteNavigation(message, input.history);
+    if (navigation) {
+      const text = `Ho aperto ${navigation.title} nel dock.`;
+      this.engine.recordExchange(message, text);
+      emit({ type: 'assistant', runId: 'navigation', text });
+      emit({ type: 'dock_navigation', runId: 'navigation', url: navigation.path, title: navigation.title });
+      emit({ type: 'done', runId: 'navigation' });
+      await this.audit.write('agent_onarsuite_navigation', 'info', 'Navigazione OnarSuite automatica', { path: navigation.path, title: navigation.title });
+      return;
+    }
 
     const mode = input.mode ?? 'execute';
     const assistantOutcome = mode === 'execute' ? await this.assistantActions.handleMessage(input.conversationId, message) : null;

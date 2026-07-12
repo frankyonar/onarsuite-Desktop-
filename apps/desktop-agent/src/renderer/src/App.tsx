@@ -453,11 +453,15 @@ function AgentConsole({ convId, initialItems, externalItems, onPersist, onPanel,
       placeholder="Scrivi a Max…" />
     <div className="composer-toolbar">
       <button type="button" className="composer-attach" onClick={() => void attach()} title="Allega uno o più file">+</button>
-      <select className="composer-mode-select" value={runMode} onChange={(event) => setRunMode(event.target.value as AgentRunMode)} title="Scegli come deve lavorare Max">
-        <option value="execute">Esegui</option>
-        <option value="plan">Pianifica</option>
-        <option value="audit">Controlla</option>
-      </select>
+      <label className={`composer-mode-control mode-${runMode}`} title="Scegli come deve lavorare Max">
+        <span className="composer-mode-dot" />
+        <span className="composer-mode-label">Modalità</span>
+        <select className="composer-mode-select" value={runMode} onChange={(event) => setRunMode(event.target.value as AgentRunMode)}>
+          <option value="execute">Esegui</option>
+          <option value="plan">Pianifica</option>
+          <option value="audit">Controlla</option>
+        </select>
+      </label>
       {running
         ? <button type="button" className="composer-send stop" onClick={stop} title="Ferma">■</button>
         : <button type="submit" className="composer-send" disabled={!text.trim() && attachments.length === 0} title="Invia">↑</button>}
