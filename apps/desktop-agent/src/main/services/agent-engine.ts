@@ -49,6 +49,8 @@ METODO DA DIPENDENTE DIGITALE:
 - Le azioni distruttive, irreversibili, finanziarie o di invio esterno richiedono conferma esplicita nel Magic Panel.
 
 GENERAZIONE FILE E CODICE:
+- Per PDF, Excel, Word, CSV, Markdown, HTML e documenti di testo usa create_document: deve esistere un file reale prima di dire che è stato creato. Se l'utente chiede Libreria OnarSuite o Google Drive, passa la destinazione richiesta e riporta separatamente l'esito di ogni consegna.
+- Non affermare MAI che un documento è nella Libreria o in Drive se create_document, onar_upload o drive_create_file non ha restituito successo. Se Drive non è configurato, apri /google-drive/settings e spiega che va collegato.
 - Sai scrivere codice in qualsiasi linguaggio (Python, JS/TS, HTML/CSS, PHP, SQL, shell, ecc.) e generare documenti.
 - Quando l'utente chiede di generare/creare codice o un file, NON limitarti a incollarlo in chat: crealo come FILE REALE con create_file (o write_file se esiste già), poi indica il percorso. Mostra anche un breve estratto nel messaggio.
 - Se non è indicata una cartella, usa la OnarSuite Workspace (sempre autorizzata). Scegli un nome file sensato con l'estensione giusta.
@@ -244,6 +246,7 @@ function describe(tool: ToolName, args: Record<string, unknown>): { title: strin
     case 'run_shell': return { title: 'Shell', command: `run · ${String(args.command ?? '')}` };
     case 'open_onarsuite_page': return { title: 'Navigazione', command: `open · ${String(args.path ?? '/')}` };
     case 'business_brief': return { title: 'Cabina di regia', command: `brief · ${String(args.horizon_days ?? 7)} giorni` };
+    case 'create_document': return { title: 'Documento', command: `${String(args.format ?? '').toUpperCase()} · ${String(args.filename ?? args.title ?? 'documento')}` };
     case 'onar_action': return { title: 'OnarSuite', command: `${String(args.action_type ?? 'azione')}` };
     case 'onar_upload': return { title: 'OnarSuite', command: `upload · ${base}` };
     case 'request_form': return { title: 'Magic Panel', command: `form · ${String(args.title ?? args.action ?? 'dati')}` };
@@ -305,6 +308,15 @@ export function buildPanel(tool: string, args: Record<string, unknown>, result: 
         typeof section.count === 'number' ? String(section.count) : '—',
         compact(str(section.message), 120) || '—',
       ]),
+    };
+  }
+
+  if (tool === 'create_document' && result.data && typeof result.data === 'object') {
+    const data = result.data as { path?: string; filename?: string; format?: string; size?: number; deliveries?: Array<{ destination?: string; ok?: boolean; message?: string }> };
+    return {
+      kind: 'file', title: data.filename || 'Documento', subtitle: `${String(data.format ?? '').toUpperCase()} · ${data.size ?? 0} byte`,
+      path: data.path, ok: result.ok,
+      fields: (data.deliveries ?? []).map((delivery) => ({ label: delivery.destination || 'Destinazione', value: `${delivery.ok ? '✓' : '✕'} ${delivery.message || ''}` })),
     };
   }
 

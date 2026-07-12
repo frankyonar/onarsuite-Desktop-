@@ -29,6 +29,7 @@ interface QueuedAction {
   filePath: string;
   createdAt: string;
   attempts: number;
+  uploadMetadata?: Record<string, unknown>;
 }
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -49,7 +50,7 @@ export class DesktopRuntime {
   readonly tools = new AgentTools(
     this.config,
     this.audit,
-    (filePath) => this.performFileAction(filePath, 'upload'),
+    (filePath, metadata) => this.performFileAction(filePath, 'upload', true, randomUUID(), metadata),
     (actionType, data) => this.sdk.onarExecute(actionType, data),
     (query) => this.workspace.search(query, { limit: 8 }),
     (query, level) => this.workspace.context({ query, level, mode: 'desktop' }),
@@ -269,7 +270,7 @@ export class DesktopRuntime {
     shell.showItemInFolder(filePath);
   }
 
-  async performFileAction(filePath: string, action: FileAction, queueOnNetworkError = true, idempotencyKey: string = randomUUID()): Promise<ActionResult> {
+  async performFileAction(filePath: string, action: FileAction, queueOnNetworkError = true, idempotencyKey: string = randomUUID(), uploadMetadata: Record<string, unknown> = {}): Promise<ActionResult> {
     await this.assertAuthorized(filePath);
     const details = await stat(filePath);
     if (details.size > MAX_UPLOAD_BYTES) throw new Error('Il file supera il limite configurato di 50 MB.');
@@ -277,8 +278,13 @@ export class DesktopRuntime {
     if (!config.deviceId) throw new Error('Collega prima Max Desktop a OnarSuite.');
 
     try {
+      let successMessage = 'Operazione completata su OnarSuite.';
       if (action === 'upload') {
-        await this.sdk.uploadArtifact(filePath, config.deviceId, idempotencyKey);
+        const uploaded = await this.sdk.uploadArtifact(filePath, config.deviceId, idempotencyKey, uploadMetadata);
+        if (uploaded.library_error) throw new Error(`File ricevuto dal server ma non pubblicato nella Libreria: ${uploaded.library_error}`);
+        successMessage = uploaded.library
+          ? `File caricato nella Libreria OnarSuite (ID ${uploaded.library.media_id}). Percorso: ${uploaded.library.path}`
+          : 'File caricato su OnarSuite.';
       } else {
         const parsed = await parseDocument(filePath);
         const kind = action === 'create_task' ? 'task' : action === 'create_customer_draft' ? 'customer-draft' : 'quote-draft';
@@ -287,7 +293,7 @@ export class DesktopRuntime {
       this.connection = 'connected';
       await this.config.update({ lastSyncAt: new Date().toISOString() });
       await this.audit.write(actionEvent(action), 'info', 'Azione completata su OnarSuite', { filename: path.basename(filePath) });
-      return { status: 'completed', message: 'Operazione completata su OnarSuite.' };
+      return { status: 'completed', message: successMessage };
     } catch (error) {
       if (queueOnNetworkError && error instanceof NetworkError) {
         await this.enqueue({
@@ -297,6 +303,7 @@ export class DesktopRuntime {
           filePath,
           createdAt: new Date().toISOString(),
           attempts: 0,
+          uploadMetadata,
         });
         this.connection = 'offline';
         await this.audit.write('action_queued', 'warning', 'OnarSuite offline: azione salvata nella coda locale', {
@@ -324,7 +331,7 @@ export class DesktopRuntime {
       const remaining: QueuedAction[] = [];
       for (const item of queue) {
         try {
-          await this.performFileAction(item.filePath, item.action, false, item.idempotencyKey);
+          await this.performFileAction(item.filePath, item.action, false, item.idempotencyKey, item.uploadMetadata ?? {});
         } catch {
           remaining.push({ ...item, attempts: item.attempts + 1 });
         }

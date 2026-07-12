@@ -8,6 +8,7 @@ import { isAllowedPath } from '../../shared/path-policy';
 import type { AuditLog } from './audit-log';
 import type { ConfigStore } from './config-store';
 import { isSupportedFile, parseDocument } from './document-parser';
+import { DOCUMENT_MIME, generateDocument, type GeneratedDocumentFormat, type GeneratedDocumentSpec } from './document-generator';
 
 const execAsync = promisify(exec);
 
@@ -40,7 +41,7 @@ export class AgentTools {
   constructor(
     private readonly config: ConfigStore,
     private readonly audit: AuditLog,
-    private readonly onarUpload: (filePath: string) => Promise<ActionResult>,
+    private readonly onarUpload: (filePath: string, metadata?: Record<string, unknown>) => Promise<ActionResult>,
     private readonly onarExecute: (actionType: string, data: Record<string, unknown>) => Promise<{ success: boolean; message: string; data?: unknown }>,
     private readonly workspaceSearch: (query: string) => Promise<WorkspaceSearchResult[]>,
     private readonly workspaceContext: (query: string, level: WorkspaceBudgetLevel) => Promise<AiContextResult>,
@@ -81,6 +82,18 @@ export class AgentTools {
         path: filePath,
         content: { type: 'string', description: 'Contenuto del nuovo file.' },
       }, ['path', 'content']),
+      fn('create_document', 'Genera un documento REALE e verificabile in PDF, Excel, Word, CSV, Markdown, HTML o testo. Salva una copia locale e, se richiesto esplicitamente, la carica nella Libreria OnarSuite e/o su Google Drive. Usa questo invece di dichiarare a parole di aver creato un documento.', {
+        format: { type: 'string', enum: ['pdf', 'xlsx', 'docx', 'csv', 'txt', 'md', 'html'], description: 'Formato del file.' },
+        filename: { type: 'string', description: 'Nome file con o senza estensione.' },
+        title: { type: 'string', description: 'Titolo visibile nel documento.' },
+        content: { type: 'string', description: 'Contenuto principale.' },
+        sections: { type: 'array', description: 'Sezioni ordinate.', items: { type: 'object', properties: { heading: { type: 'string' }, content: { type: 'string' } }, required: ['content'] } },
+        table: { type: 'object', description: 'Tabella opzionale.', properties: { columns: { type: 'array', items: { type: 'string' } }, rows: { type: 'array', items: { type: 'array', items: {} } } } },
+        destination: { type: 'string', enum: ['local', 'onarsuite', 'google_drive', 'onarsuite_and_drive', 'all'], description: 'Destinazione richiesta.' },
+        local_path: { type: 'string', description: 'Percorso opzionale dentro una cartella autorizzata. Vuoto = Workspace.' },
+        drive_parent_id: { type: 'string', description: 'ID cartella Drive opzionale. Default root.' },
+        category: { type: 'string', description: 'Categoria Libreria opzionale.' },
+      }, ['format', 'title']),
       fn('delete_file', 'Elimina un file dentro una cartella autorizzata.', {
         path: filePath,
       }, ['path']),
@@ -128,6 +141,7 @@ export class AgentTools {
       case 'write_file': return this.writeFile(String(args.path ?? ''), String(args.content ?? ''));
       case 'edit_file': return this.editFile(String(args.path ?? ''), String(args.old_string ?? ''), String(args.new_string ?? ''), Boolean(args.replace_all));
       case 'create_file': return this.createFile(String(args.path ?? ''), String(args.content ?? ''));
+      case 'create_document': return this.createDocument(args);
       case 'delete_file': return this.deleteFile(String(args.path ?? ''));
       case 'run_shell': return this.runShell(String(args.command ?? ''), args.cwd ? String(args.cwd) : undefined);
       case 'open_onarsuite_page': return this.openOnarSuitePage(String(args.path ?? ''), String(args.title ?? 'OnarSuite'));
@@ -373,6 +387,51 @@ export class AgentTools {
     };
   }
 
+  private async createDocument(args: Record<string, unknown>): Promise<ToolResult> {
+    const allowedFormats = new Set<GeneratedDocumentFormat>(['pdf', 'xlsx', 'docx', 'csv', 'txt', 'md', 'html']);
+    const format = String(args.format ?? '').toLowerCase() as GeneratedDocumentFormat;
+    if (!allowedFormats.has(format)) return { ok: false, content: 'Formato documento non supportato.', preview: 'Formato non supportato' };
+    const title = String(args.title ?? '').trim();
+    if (!title) return { ok: false, content: 'Titolo documento mancante.', preview: 'Titolo mancante' };
+    const destination = String(args.destination ?? 'local');
+    const requestedName = String(args.filename ?? title).trim() || title;
+    const fileName = `${sanitizeDocumentName(requestedName.replace(/\.[a-z0-9]+$/i, ''))}.${format}`;
+    const localPath = String(args.local_path ?? '').trim();
+    const output = await this.assertWritable(localPath ? (path.extname(localPath) ? localPath : path.join(localPath, fileName)) : fileName);
+    await mkdir(path.dirname(output), { recursive: true });
+    const sections = Array.isArray(args.sections) ? args.sections.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === 'object')).map((entry) => ({ heading: entry.heading ? String(entry.heading) : undefined, content: String(entry.content ?? '') })) : [];
+    const rawTable = args.table && typeof args.table === 'object' ? args.table as Record<string, unknown> : undefined;
+    const columns = Array.isArray(rawTable?.columns) ? rawTable.columns.map(String) : [];
+    const rows = Array.isArray(rawTable?.rows) ? rawTable.rows.filter(Array.isArray).map((row) => row as Array<string | number | boolean | null>) : [];
+    const spec: GeneratedDocumentSpec = { title, content: args.content ? String(args.content) : undefined, sections, table: columns.length ? { columns, rows } : undefined, format };
+    const bytes = await generateDocument(spec);
+    await writeFile(output, bytes);
+
+    const wantsOnarSuite = ['onarsuite', 'onarsuite_and_drive', 'all'].includes(destination);
+    const wantsDrive = ['google_drive', 'onarsuite_and_drive', 'all'].includes(destination);
+    const deliveries: Array<{ destination: string; ok: boolean; message: string; data?: unknown }> = [{ destination: 'locale', ok: true, message: output }];
+    if (wantsOnarSuite) {
+      try {
+        const uploaded = await this.onarUpload(output, { category: String(args.category ?? 'generic') || 'generic' });
+        deliveries.push({ destination: 'Libreria OnarSuite', ok: uploaded.status === 'completed', message: uploaded.message });
+      } catch (error) {
+        deliveries.push({ destination: 'Libreria OnarSuite', ok: false, message: error instanceof Error ? error.message : 'Caricamento fallito.' });
+      }
+    }
+    if (wantsDrive) {
+      try {
+        const uploaded = await this.onarExecute('drive_create_file', { name: fileName, content_base64: bytes.toString('base64'), mime_type: DOCUMENT_MIME[format], parent_id: String(args.drive_parent_id ?? 'root') || 'root', _confirmed: true });
+        deliveries.push({ destination: 'Google Drive', ok: uploaded.success, message: uploaded.message, data: uploaded.data });
+      } catch (error) {
+        deliveries.push({ destination: 'Google Drive', ok: false, message: `${error instanceof Error ? error.message : 'Google Drive non disponibile.'} Configuralo prima in OnarSuite > Google Drive.` });
+      }
+    }
+    const allRequestedOk = deliveries.every((delivery) => delivery.ok);
+    await this.log('agent_document_created', 'info', `Documento creato: ${fileName}`, { format, bytes: bytes.length, onarSuite: wantsOnarSuite, googleDrive: wantsDrive, delivered: allRequestedOk });
+    const summary = deliveries.map((delivery) => `${delivery.ok ? 'OK' : 'ERRORE'} ${delivery.destination}: ${delivery.message}`).join('\n');
+    return { ok: allRequestedOk, content: `Documento reale creato.\nPercorso locale: ${output}\n${summary}`, preview: `${fileName} · ${deliveries.filter((delivery) => delivery.ok).length}/${deliveries.length} destinazioni`, data: { path: output, filename: fileName, format, mimeType: DOCUMENT_MIME[format], size: bytes.length, deliveries } };
+  }
+
   private async onarUploadFile(p: string): Promise<ToolResult> {
     const target = await this.assertInside(p);
     const result = await this.onarUpload(target);
@@ -453,6 +512,11 @@ function countBusinessItems(value: unknown): number | undefined {
     if (Array.isArray(nested)) return nested.length;
   }
   return undefined;
+}
+
+function sanitizeDocumentName(value: string): string {
+  const clean = value.replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '');
+  return (clean || 'documento').slice(0, 120);
 }
 
 function headPreview(target: string, content: string): string {

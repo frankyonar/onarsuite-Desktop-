@@ -36,6 +36,8 @@ const ROUTES: RouteDefinition[] = [
   { path: '/site-studio', title: 'Site Studio', aliases: ['site studio', 'sito web', 'gestione sito'] },
   { path: '/automat-pdf', title: 'Creative PDF', aliases: ['creative pdf', 'automat pdf', 'crea pdf'] },
   { path: '/google-contacts', title: 'Contatti Google', aliases: ['contatti google', 'google contacts'] },
+  { path: '/google-drive/settings', title: 'Impostazioni Google Drive', aliases: ['configura google drive', 'collega google drive', 'impostazioni google drive', 'accesso google drive'] },
+  { path: '/googledrives/general/root', title: 'Google Drive', aliases: ['google drive', 'file drive', 'cartella drive'] },
   { path: '/form-builder', title: 'Form Builder', aliases: ['form builder', 'moduli', 'crea modulo'] },
   { path: '/settings', title: 'Impostazioni', aliases: ['impostazioni', 'configurazione', 'settaggi'] },
   { path: '/profile', title: 'Profilo personale', aliases: ['profilo personale', 'il mio profilo', 'account personale'] },

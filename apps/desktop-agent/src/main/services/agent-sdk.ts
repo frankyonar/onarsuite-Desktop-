@@ -49,12 +49,12 @@ export class AgentSdk {
     return Array.isArray(result) ? result : result.actions;
   }
 
-  async uploadArtifact(filePath: string, deviceId: string, idempotencyKey: string): Promise<unknown> {
+  async uploadArtifact(filePath: string, deviceId: string, idempotencyKey: string, metadata: Record<string, unknown> = {}): Promise<{ id: number; uuid: string; original_filename: string; library?: { media_id: number; path: string } | null; library_error?: string | null }> {
     const bytes = await readFile(filePath);
     const body = new FormData();
     body.append('file', new Blob([bytes]), path.basename(filePath));
     body.append('device_id', deviceId);
-    body.append('metadata', JSON.stringify({ source: 'desktop_upload' }));
+    body.append('metadata', JSON.stringify({ source: 'desktop_upload', publish_to_library: true, ...metadata }));
     return this.request('/api/agent/artifacts', { method: 'POST', body, headers: { 'Idempotency-Key': idempotencyKey } });
   }
 

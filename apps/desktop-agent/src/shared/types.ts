@@ -8,7 +8,7 @@ import type {
   WorkspaceStatus,
 } from './workspace';
 
-export const APP_VERSION = '0.9.52';
+export const APP_VERSION = '0.9.53';
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
 
@@ -59,6 +59,7 @@ export type ToolName =
   | 'write_file'
   | 'edit_file'
   | 'create_file'
+  | 'create_document'
   | 'delete_file'
   | 'run_shell'
   | 'open_onarsuite_page'

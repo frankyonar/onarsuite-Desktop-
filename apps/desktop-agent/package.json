@@ -1,6 +1,6 @@
 {
   "name": "@onarsuite/max-desktop",
-  "version": "0.9.52",
+  "version": "0.9.53",
   "private": true,
   "description": "OnarSuite - agente desktop locale sicuro con Max AI",
   "main": "out/main/index.js",
@@ -15,16 +15,19 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
+    "docx": "^9.7.1",
     "electron-updater": "^6.8.9",
     "highlight.js": "^11.11.1",
     "mammoth": "^1.10.0",
+    "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
     "read-excel-file": "^6.0.1",
     "rehype-highlight": "^7.0.2",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
